@@ -34,6 +34,3 @@ touch $testfile
 
 echo "Running ls ."
 ls .
-
-echo "Running ls PeerTube"
-ls PeerTube
