@@ -61,7 +61,7 @@
     "i18n:update": "bash ./scripts/i18n/update.sh",
     "lint": "npm run ci -- lint",
     "mocha": "mocha",
-    "mock-build": "bash ./scripts/mock-build.sh"
+    "mock-build": "bash ./scripts/mock-build.sh",
     "ng": "ng",
     "nightly": "bash ./scripts/nightly.sh",
     "openapi-clients": "bash ./scripts/openapi-clients.sh",
