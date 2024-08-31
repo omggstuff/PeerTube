@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
 
-  nightly:
+  custom-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,4 +25,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: peertube-build
-          path: PeerTube/*.tar.xz
+          path: ./*.tar.xz
