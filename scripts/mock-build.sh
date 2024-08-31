@@ -32,8 +32,8 @@ touch $testfile
   rm "$directory_name"
 )
 
-echo "Running `ls .`"
+echo "Running ls ."
 ls .
 
-echo "Running `ls PeerTube`"
+echo "Running ls PeerTube"
 ls PeerTube
