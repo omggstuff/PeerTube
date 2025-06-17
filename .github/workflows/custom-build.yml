@@ -8,21 +8,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      -
-        name: Checkout develop
+      - name: Checkout branch
         uses: actions/checkout@v4
-        with:
-          ref: develop
 
       - uses: './.github/actions/reusable-prepare-peertube-build'
         with:
           node-version: '20.x'
 
-      - name: Build
+      - name: Build release
         run: npm run nightly
+
+      - name: Get current date
+        run: echo "currentDate=$(date +%F-%H%M%S)" >> $GITHUB_ENV
 
       - name: Upload release file
         uses: actions/upload-artifact@v4
         with:
-          name: peertube-build
+          name: peertube-build-${{ env.currentDate }}
           path: ./*.tar.xz
