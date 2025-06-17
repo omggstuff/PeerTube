@@ -1,0 +1,27 @@
+name: Workflow Testing
+
+on: workflow_dispatch
+
+jobs:
+
+  custom-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Build
+        run: touch lol.tar.xz
+
+      - name: Get Current Date
+        run: echo "currentDate=$(date +%F-%H%M%S)" >> $GITHUB_ENV
+        
+      - name: Upload release file
+        uses: actions/upload-artifact@v4
+        with:
+          name: peertube-build-${{ env.currentDate }}
+          path: ./*.tar.xz
