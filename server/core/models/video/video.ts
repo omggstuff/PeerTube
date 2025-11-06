@@ -952,7 +952,7 @@ export class VideoModel extends SequelizeModel<VideoModel> {
       distinct: true,
       offset: start,
       limit: count,
-      order: getVideoSort('-createdAt', [ 'Tags', 'name', 'ASC' ]),
+      order: getVideoSort('-createdAt'),
       where: {
         id: {
           [Op.in]: Sequelize.literal('(' + rawQuery + ')')

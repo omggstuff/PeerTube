@@ -176,9 +176,7 @@ export class VideosModelGetQuerySubBuilder extends AbstractVideoQueryBuilder {
   }
 
   private buildQuery (options: BuildVideoGetQueryOptions) {
-    const order = VideosModelGetQuerySubBuilder.tagsInclude.has(options.type)
-      ? 'ORDER BY "Tags"."name" ASC'
-      : ''
+    const order = ''
 
     const from = `SELECT * FROM "video" ${this.where} LIMIT 1`
 
