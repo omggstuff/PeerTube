@@ -1,6 +1,6 @@
 import { throwError as observableThrowError } from 'rxjs'
 import { HttpHeaderResponse } from '@angular/common/http'
-import { Inject, Injectable, LOCALE_ID } from '@angular/core'
+import { Injectable, LOCALE_ID, inject } from '@angular/core'
 import { Router } from '@angular/router'
 import { DateFormat, dateToHuman } from '@app/helpers'
 import { HttpStatusCode, HttpStatusCodeType, ResultList } from '@peertube/peertube-models'
@@ -8,13 +8,10 @@ import { logger } from '@root-helpers/logger'
 
 @Injectable()
 export class RestExtractor {
+  private localeId = inject(LOCALE_ID)
+  private router = inject(Router)
 
-  constructor (
-    @Inject(LOCALE_ID) private localeId: string,
-    private router: Router
-  ) { }
-
-  applyToResultListData <T, A, U> (
+  applyToResultListData<T, A, U> (
     result: ResultList<T>,
     fun: (data: T, ...args: A[]) => U,
     additionalArgs: A[] = []
@@ -27,7 +24,7 @@ export class RestExtractor {
     }
   }
 
-  convertResultListDateToHuman <T> (
+  convertResultListDateToHuman<T> (
     result: ResultList<T>,
     fieldsToConvert: string[] = [ 'createdAt' ],
     format?: DateFormat
@@ -115,10 +112,6 @@ export class RestExtractor {
         .join('. ')
     }
 
-    if (err.error?.error) {
-      return err.error.error
-    }
-
     if (err.status === HttpStatusCode.PAYLOAD_TOO_LARGE_413) {
       return $localize`Media is too large for the server. Please contact you administrator if you want to increase the limit size.`
     }
@@ -142,6 +135,6 @@ export class RestExtractor {
       return $localize`Server is unavailable. Please retry later.`
     }
 
-    return $localize`Unknown server error`
+    return err.error?.error || err.error?.detail || err.error?.title || $localize`Unknown server error`
   }
 }

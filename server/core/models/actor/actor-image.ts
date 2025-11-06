@@ -1,19 +1,10 @@
 import { ActivityIconObject, ActorImage, ActorImageType, type ActorImageType_Type } from '@peertube/peertube-models'
 import { getLowercaseExtension } from '@peertube/peertube-node-utils'
-import { MActorId, MActorImage, MActorImageFormattable } from '@server/types/models/index.js'
+import { MActorId, MActorImage, MActorImageFormattable, MActorImagePath } from '@server/types/models/index.js'
 import { remove } from 'fs-extra/esm'
 import { join } from 'path'
 import { Op } from 'sequelize'
-import {
-  AfterDestroy,
-  AllowNull,
-  BelongsTo,
-  Column,
-  CreatedAt,
-  Default,
-  ForeignKey, Table,
-  UpdatedAt
-} from 'sequelize-typescript'
+import { AfterDestroy, AllowNull, BelongsTo, Column, CreatedAt, Default, ForeignKey, Table, UpdatedAt } from 'sequelize-typescript'
 import { logger } from '../../helpers/logger.js'
 import { CONFIG } from '../../initializers/config.js'
 import { LAZY_STATIC_PATHS, MIMETYPES, WEBSERVER } from '../../initializers/constants.js'
@@ -34,42 +25,41 @@ import { ActorModel } from './actor.js'
   ]
 })
 export class ActorImageModel extends SequelizeModel<ActorImageModel> {
-
   @AllowNull(false)
   @Column
-  filename: string
+  declare filename: string
 
   @AllowNull(true)
   @Default(null)
   @Column
-  height: number
+  declare height: number
 
   @AllowNull(true)
   @Default(null)
   @Column
-  width: number
+  declare width: number
 
   @AllowNull(true)
   @Column
-  fileUrl: string
+  declare fileUrl: string
 
   @AllowNull(false)
   @Column
-  onDisk: boolean
+  declare onDisk: boolean
 
   @AllowNull(false)
   @Column
-  type: ActorImageType_Type
+  declare type: ActorImageType_Type
 
   @CreatedAt
-  createdAt: Date
+  declare createdAt: Date
 
   @UpdatedAt
-  updatedAt: Date
+  declare updatedAt: Date
 
   @ForeignKey(() => ActorModel)
   @Column
-  actorId: number
+  declare actorId: number
 
   @BelongsTo(() => ActorModel, {
     foreignKey: {
@@ -77,7 +67,7 @@ export class ActorImageModel extends SequelizeModel<ActorImageModel> {
     },
     onDelete: 'CASCADE'
   })
-  Actor: Awaited<ActorModel> // TODO: Remove awaited: https://github.com/sequelize/sequelize-typescript/issues/825
+  declare Actor: Awaited<ActorModel> // TODO: Remove awaited: https://github.com/sequelize/sequelize-typescript/issues/825
 
   @AfterDestroy
   static removeFile (instance: ActorImageModel) {
@@ -149,7 +139,7 @@ export class ActorImageModel extends SequelizeModel<ActorImageModel> {
     })
   }
 
-  static getImageUrl (image: MActorImage) {
+  static getImageUrl (image: MActorImagePath) {
     if (!image) return undefined
 
     return WEBSERVER.URL + image.getStaticPath()
@@ -159,26 +149,26 @@ export class ActorImageModel extends SequelizeModel<ActorImageModel> {
 
   toFormattedJSON (this: MActorImageFormattable): ActorImage {
     return {
+      height: this.height,
       width: this.width,
       path: this.getStaticPath(),
+      fileUrl: ActorImageModel.getImageUrl(this),
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     }
   }
 
   toActivityPubObject (): ActivityIconObject {
-    const extension = getLowercaseExtension(this.filename)
-
     return {
       type: 'Image',
-      mediaType: MIMETYPES.IMAGE.EXT_MIMETYPE[extension],
+      mediaType: this.getMimeType(),
       height: this.height,
       width: this.width,
       url: ActorImageModel.getImageUrl(this)
     }
   }
 
-  getStaticPath () {
+  getStaticPath (this: MActorImagePath) {
     switch (this.type) {
       case ActorImageType.AVATAR:
         return join(LAZY_STATIC_PATHS.AVATARS, this.filename)
@@ -200,7 +190,11 @@ export class ActorImageModel extends SequelizeModel<ActorImageModel> {
     return remove(imagePath)
   }
 
-  isOwned () {
+  isLocal () {
     return !this.fileUrl
+  }
+
+  getMimeType () {
+    return MIMETYPES.IMAGE.EXT_MIMETYPE[getLowercaseExtension(this.filename)]
   }
 }

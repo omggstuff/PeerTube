@@ -1,3 +1,4 @@
+import { PlayerThemeVideoSetting } from '../../player/player-theme.type.js'
 import {
   LiveVideoLatencyModeType,
   VideoCommentPolicyType,
@@ -40,6 +41,10 @@ export interface VideoExportJSON {
       replaySettings?: {
         privacy: VideoPrivacyType
       }
+
+      schedules?: {
+        startAt: string
+      }[]
     }
 
     url: string
@@ -102,6 +107,10 @@ export interface VideoExportJSON {
       fps: number
 
       metadata: VideoFileMetadata
+    }
+
+    playerSettings?: {
+      theme: PlayerThemeVideoSetting
     }
 
     archiveFiles: {

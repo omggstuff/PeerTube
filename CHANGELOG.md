@@ -1,5 +1,593 @@
 # Changelog
 
+## v7.3.0
+
+### IMPORTANT NOTES
+
+  * Minimum supported NodeJS version is `20.19`
+
+### NGINX
+
+ * Disable request buffering on upload endpoints to fix HTTP request timeouts: https://github.com/Chocobozzz/PeerTube/commit/d1a35e8421195088e2754b787c4af1e765b9eaa9
+
+### Plugins/Themes/Embed API
+
+  * **Breaking change** Plugin and themes must use `:root` CSS selector instead of `body` to inject CSS variables
+  * Add server API (https://docs.joinpeertube.org/api/plugins):
+    * Support `externalRedirectUri` for `registerExternalAuth` so PeerTube redirects users on another URL set by the plugin
+    * If your plugin uses `filter:email.template-path.result` server hook: emails now use Handlebars template engine instead of Pug template engine
+
+### Features
+
+  * :tada: Emails can now be translated :tada: Check the [translation documentation](https://docs.joinpeertube.org/support/doc/translation) to help us translate emails in your language!
+  * :tada: Introduce a web configuration wizard to help administrators to configure their instance automatically :tada:
+    * The wizard appears once the administrators have logged in following the installation of the PeerTube instance
+    * Admins can also run the wizard via a button in the web admin config
+    * The main instance information (e.g. name, short description, logo, primary colour) can be entered using the wizard.
+    * It also helps the admin to apply a configuration depending on the instance type (community-based, institutional, private)
+  * :tada: Redesign the admin config to use a lateral menu for navigating between subsections :tada:
+    * Add a new *Customization* page to easily change the main colors and shape of the client interface
+    * Add a new *Logo* page where admins can upload logos/favicon and social media images for their instances
+    * Add an option to set the default licence, privacy and comments policy when publishing videos
+    * The email prefix and body can now be changed in the web admin config. These configurations also support the `{{instanceName}}` template variable, which is replaced by the instance name
+  * Improve admin federation control:
+    * Add the ability for admins to completely disable remote subscriptions to local channels
+    * Admins can also set up automatic rejection of video comments from remote instances
+  * Add 2FA column information in admin users overview table
+  * Display remote runner version in admin
+  * Add ability for users to set the planned date of a live. These lives are displayed when browsing videos [#7144](https://github.com/Chocobozzz/PeerTube/pull/7144)
+  * Improve data tables UX/UI
+  * Improve account/channel playlists management:
+    * Use a data table to manage account and channel playlists
+    * Allow to manually set the order of the public playlists displayed in a channel
+  * Improve sensitive content warning in embed player
+  * Improve audio transcoding quality, especially with FLAC input
+  * Support Creole French languages in video language metadata
+  * Add ability for users to list and revoke token sessions
+  * Support *Free of known copyright restrictions* and *Copyrighted - All Rights Reserved* video licence metadata
+  * Play/pause the video player using `k` key
+
+### Bug fixes
+
+  * Fix ActivityPub audience for unlisted videos
+  * Use an array of URL in `attributedTo` ActivityPub field
+  * Prefer `og:image` instead of `og:image:url`
+  * Better thumbnail blur for sensitive content [#7105](https://github.com/Chocobozzz/PeerTube/pull/7105)
+  * Prefer `allow="fullscreen"` for video embed `iframe` [#7043](https://github.com/Chocobozzz/PeerTube/pull/7043)
+  * Respect the sensitive content policy, even for videos owned by the user
+  * Fix the issue of the scroll position not being restored when pages load slowly [#7143](https://github.com/Chocobozzz/PeerTube/pull/7143)
+  * Fix remote actor follow counter after a local subscription
+  * Fix reloading videos in *Browser videos* when the link only changes query parameters
+  * Add stall job check for remote studio and transcription runner jobs
+  * Prevent metric warning for redundancy gauge
+  * Fix disabling *Wait transcoding* checkbox
+  * Correctly import new elements of a playlist in channel synchronization
+  * Fix overflow in discover page
+  * Fix restoring scroll position when going back in the web browser on the homepage set by the admin
+  * Fill video support on channel sync
+  * Respect instance default privacy setting when publishing imports and lives
+  * Remove useless help for live transcoding
+  * Fix RTL margins on some components
+
+
+## v7.2.3
+
+### SECURITY
+
+ * Upgrade `multer` dependency to prevent Denial of Service with a malformed request
+
+### Bug fixes
+
+ * Fix channel synchronization that duplicates video imports
+
+
+## v7.2.2
+
+### SECURITY
+
+ * Prevent ReDOS from `useragent` package by removing deprecated Do Not Track feature. Thanks to Patrick Bohn Matthiesen and [Leonora](https://github.com/herover) from IT University of Copenhagen for reporting this vulnerability!
+
+### Bug fixes
+
+ * Correctly display bulk actions button in "My videos"
+ * Keep playlist name original casing in "My videos"
+ * Fix PIP button z-index on Firefox
+ * More robust S3 upload and ACL error handler
+ * Fix broken video state on S3 move failure
+ * Reset filters when loading query params in "Browse videos"
+ * Fix upload tab title when the file is uploaded
+ * Fix follow card overflow in about page
+ * Convert to full UUID request param `id` in `filter:html.embed.video.allowed.result` and `filter:html.embed.video-playlist.allowed.result` plugin hooks
+ * Fix HLS playback issue on Chrome 138
+ * Fix selecting frame on Safari
+ * Fix input search with multiple prefix tokens
+ * Fix channel sync duplicate after video deletion
+ * Fix caption raw edition when editing segment
+ * Fix accessibility issues:
+   * Fix embed title/avatar accessibility
+   * Add player P2P up/down info aria label
+   * Support escape key in the player settings menu
+   * Support arrow left/right navigation in the settings menu
+   * Fix entry focus when navigating in the settings menu
+   * Add aria controls attribute to settings button
+   * Thanks to [Woebin](https://github.com/Woebin) from [Access Lab](https://axesslab.com/) and [HowlRound Theatre Commons](https://howlround.com/) for conducting the player accessibility audit!
+
+
+## v7.2.1
+
+### Bug fixes
+
+ * Fix federation of sensitive videos with previous PeerTube versions
+ * Do not uppercase video tags to prevent accessibility issues
+ * Fix support field not automatically filled from channel data when publishing a video
+ * Fix "Add new playlist" broken style
+ * Fix browse videos page title on web browser "History Back"
+ * Fix parent menu highlighting in *About Platform* pages
+ * Don't display description/terms titles if these blocks are empty
+ * Correctly load count and rows per page when listing *My videos*
+
+
+## v7.2.0
+
+### IMPORTANT NOTES
+
+ * **Important** You need to manually execute a migration script after your upgrade while PeerTube is running and the database migration is complete (`Migrations finished. New migration version schema: xxx` in PeerTube startup logs):
+   * Classic installation: `cd /var/www/peertube/peertube-latest && sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production node dist/scripts/migrations/peertube-7.2.js`
+   * Docker installation: `cd /var/www/peertube-docker && docker compose exec -u peertube peertube node dist/scripts/migrations/peertube-7.2.js`
+
+### SECURITY
+
+ * If you installed PeerTube using the [official documentation](https://docs.joinpeertube.org/install/any-os#installation), we highly recommend setting the default user shell to `nologin`. For example on GNU/Linux: `chsh -s /usr/sbin/nologin peertube`
+ * If you installed PeerTube runners using the [official Systemd service documentation](https://docs.joinpeertube.org/maintain/tools#as-a-systemd-service), we highly recommend setting the default user shell to `nologin`. For example on GNU/Linux: `chsh -s /usr/sbin/nologin prunner`
+
+### Configuration
+
+  * Prefer to not store lives in object storage by default: `object_storage.streaming_playlists.store_live_streams` is now `false` in the config template
+  * Use `hot` trending algorithm by default: `trending.videos.default` is now `hot` in the config template
+  * Add global rate limit to video download that can be changed by `download_generate_video.max_parallel_downloads`
+
+### Docker
+
+  * Add missing docker env options to configure live settings [#6948](https://github.com/Chocobozzz/PeerTube/pull/6948)
+  * Expose NGINX logs folder in `docker-compose.yml` [#6963](https://github.com/Chocobozzz/PeerTube/pull/6963)
+  * Add exec to NGINX process to ensure is PID 1 and then ensure a graceful shutdown[#7041](https://github.com/Chocobozzz/PeerTube/pull/7041)
+
+### NGINX
+
+ * Fix max body size inconsistency with PeerTube backend: https://github.com/Chocobozzz/PeerTube/commit/a2812e40d90619528a6b2a4c491640a9737f8f3c
+
+### Plugins/Themes/Embed API
+
+  * **Breaking change** Theme CSS must include `--is-dark: 0` or `--is-dark: 1` CSS variable for the `body` so PeerTube understands if it's a dark or a light theme
+  * Add server plugin hooks (https://docs.joinpeertube.org/api/plugins):
+    * `filter:email.subject.result` & `filter:email.template-path.result` [#6876](https://github.com/Chocobozzz/PeerTube/pull/6876)
+
+### Features
+
+  * :tada: Redesign *Manage my videos* page :tada:
+    * Redesign the page to list more videos for a clearer overview
+    * Add sort, pagination and column display settings
+    * Add channel buttons to quickly filter videos
+    * Improve video search & filters
+    * Add ability to display video comments count [#6635](https://github.com/Chocobozzz/PeerTube/pull/6635)
+  * :tada: Redesign video management/publication pages :tada:
+    * Migrate the video update page to a *Manage video* tool, that includes *Studio* and *Stats* features
+    * Video publication privacy choice is moved in the second step
+    * Use a lateral menu to navigate between *Manage video* pages
+    * Add information related to the video state (transcoding, etc.) and clearly display unavailable features
+    * Add user agent stats to video stats [#6871](https://github.com/Chocobozzz/PeerTube/pull/6871)
+    * Support drag-and-drop to replace the video file [#6970](https://github.com/Chocobozzz/PeerTube/pull/6970)
+  * :tada: Improve NSFW/sensitive content system :tada:
+    * Support content warning so video authors can describe why the video is considered sensitive
+    * Change the *Blur* sensitive content policy for viewers where the miniature name is not blurred anymore
+    * Add an additional *Warn* sensitive content policy for viewers where the thumbnail is not blurred
+    * *Blur* and *Warn* policies add a *Sensitive* icon below the thumbnail. A warning is also displayed in the player
+    * The player embed now displays the sensitive content warning
+    * Add ability to set predefined sensitive flags to videos so video authors help to identify specific sensitive content
+    * If enabled by administrators, users can override their default sensitive content policy for specific flags.
+    For example, they can hide all sensitive content but display with a warning content flagged as *Violent* by video authors
+    * Add sensitive content filter in admin videos overview
+  * Allow users to resend the email verification link when changing their current email
+  * Inject subtitle links in HLS playlists so it's easier for external video players that use the `master.m3u8` playlist to display subtitles
+  * Disable log coloration when TTY does not support it [#6988](https://github.com/Chocobozzz/PeerTube/pull/6988)
+  * Support more embed parameters in custom markup (`<peertube-video-embed>` and `<peertube-playlist-embed>`) [#6989](https://github.com/Chocobozzz/PeerTube/pull/6989)
+
+### Bug fixes
+
+  * More robust theme CSS variables injection
+  * Fix podcast feed URL in subscribe button
+  * Fix podcast feed download extension when the file is a video
+  * Fix broken downloaded audio file
+  * Fix crash on download stream error
+  * Fix local posts counter in NodeInfo
+  * Run transcription after file replacement
+  * Better video chapters parsing from the description
+  * Correctly handle `generateTranscription` body param on upload/import
+  * Fix federation compatibility with GoToSocial
+  * Fix PeerTube account client redirection
+  * Prevent plugins to log exceptions
+  * Fix broken replay on live privacy change
+  * Fix iOS/Android deep link with URL that contains query params in watch page
+  * Fix ownership changes count
+  * Always specify object storage content type
+  * Fix broken live title in Chinese
+  * Fix theme crash in embed
+  * Fix broken video state on move on object storage failure
+  * Fix CORS issue with object storage providers
+  * Correctly display images in support modal
+
+
+## v7.1.1
+
+### SECURITY
+
+This release fixes important vulnerabilities discovered by Ori Hollander of the JFrog Vulnerability Research team. Many thanks to them!
+
+  * Fix DoS and blind SSRF on ActivityPub playlist creation [CVE-2025-32948](https://research.jfrog.com/vulnerabilities/peertube-activitypub-playlist-creation-blind-ssrf-dos/)
+  * Prevent infinite loop DoS when crawling ActivityPub data [CVE-2025-32947](https://research.jfrog.com/vulnerabilities/peertube-activitypub-crawl-dos/)
+  * Prevent an attacker from adding playlists to a another user's channel using the ActivityPub [CVE-2025-32946](https://research.jfrog.com/vulnerabilities/peertube-arbitrary-playlist-creation-activitypub/)
+  * Prevent an attacker from adding playlists to a another user's channel using the REST API [CVE-2025-32945](https://research.jfrog.com/vulnerabilities/peertube-arbitrary-playlist-creation-rest/)
+  * Add protection against [ZIP bomb](https://en.wikipedia.org/wiki/Zip_bomb) on user import [CVE-2025-32949](https://research.jfrog.com/vulnerabilities/peertube-archive-resource-exhaustion/)
+  * Prevent crash on user import with a ZIP containg an illegal filename [CVE-2025-32944](https://research.jfrog.com/vulnerabilities/peertube-archive-persistent-dos/)
+  * Do not leak private HLS playlists (`.m3u8` files) [CVE-2025-32943](https://research.jfrog.com/vulnerabilities/peertube-hls-path-traversal/)
+
+### Bug fixes
+
+  * Fix playlist page margins
+  * Fix danger button border
+  * Fix unsubscribe button label for channels
+  * Fix remote subscribe on iOS
+  * Add Podcast feed to subscribe button
+  * Always display technical information tab in *About* page
+  * Fix menu button auto font-size to prevent overflow in some locales
+  * Correctly inject multiple `rel="me"` links with supported markdown fields
+  * Fix adding studio watermark with audio/video split HLS file
+  * Reset video state on studio failure
+  * Fix updating a user in administration
+  * Fix error when getting a S3 object with some S3 providers
+  * Specify charset when uploading caption files in S3
+  * Fix theme color parsing with some web browsers
+  * Improve channel description in custom markup miniature
+  * Ensure ffmpeg process is killed if download is aborted
+  * Correctly reload playlist on playlist change in watch page
+  * Use `indexifembedded` in embeds instead of `noindex`
+  * Fix extra space on links of remote comments
+  * Don't convert webp images to jpeg
+
+
+## v7.1.0
+
+### IMPORTANT NOTES
+
+ * Remove NodeJS 18 support. Please upgrade to NodeJS 20 (>= 20.9) before upgrading PeerTube
+ * Due to a bug in the remote video thumbnail update, we recommend running the [prune storage](https://docs.joinpeertube.org/maintain/tools#prune-filesystem-object-storage) script to clean up the filesystem
+ * Let's encrypt is removing [OCSP support in 2025](https://letsencrypt.org/2024/12/05/ending-ocsp/), so remove SSL stapling from your nginx configuration: https://github.com/Chocobozzz/PeerTube/commit/0abaaa8ccbce19deb6fcd09c8bf00d4cf4248505
+ * Safari desktop versions < 14 are not supported anymore
+ * If you are using object storage, you will need to create the captions bucket or configure PeerTube to use an existing one [in the configuration file](https://github.com/Chocobozzz/PeerTube/blob/develop/config/production.yaml.example#L262) or using environment variables if you use Docker (`PEERTUBE_OBJECT_STORAGE_CAPTIONS_BUCKET_NAME`, `PEERTUBE_OBJECT_STORAGE_CAPTIONS_PREFIX`, `PEERTUBE_OBJECT_STORAGE_CAPTIONS_BASE_URL`)
+
+### Plugins/Themes/Embed API
+
+  * Add server plugin hooks:
+    * `filter:oauth.password-grant.get-user.params` [#6752](https://github.com/Chocobozzz/PeerTube/pull/6752)
+    * `filter:api.email-verification.ask-send-verify-email.body` [#6752](https://github.com/Chocobozzz/PeerTube/pull/6752)
+    * `filter:api.users.ask-reset-password.body` [#6752](https://github.com/Chocobozzz/PeerTube/pull/6752)
+  * Call `action:api.user.deleted` server hook when users delete their own account [#6860](https://github.com/Chocobozzz/PeerTube/pull/6860)
+  * Add client plugin support for external links in the left menu [#6784](https://github.com/Chocobozzz/PeerTube/pull/6784)
+  * Add new client scopes: `admin-users`, `admin-comments` and `moderation` [#6692](https://github.com/Chocobozzz/PeerTube/pull/6692)
+  * Add client plugin hooks [#6692](https://github.com/Chocobozzz/PeerTube/pull/6692):
+    * `filter:internal.player.p2p-media-loader.options.result`
+    * `filter:admin-users-list.bulk-actions.create.result`
+    * `filter:admin-video-comments-list.actions.create.result`
+    * `filter:admin-video-comments-list.bulk-actions.create.result`
+    * `filter:user-moderation.actions.create.result`
+    * `filter:admin-abuse-list.actions.create.result`
+  * Introduce a new client API to run actions (reload the user table, reload video comments, etc.): https://docs.joinpeertube.org/contribute/plugins#run-actions
+
+### Docker
+
+ * Add the ability to specify peertube UID and GID via environment variables [#6809](https://github.com/Chocobozzz/PeerTube/pull/6809)
+ * Fix RTMPS port non exposed by the Docker container
+
+### NGINX
+
+ * Remove SSL stapling: https://github.com/Chocobozzz/PeerTube/commit/0abaaa8ccbce19deb6fcd09c8bf00d4cf4248505
+ * Support RSS feed gzip compression: https://github.com/Chocobozzz/PeerTube/commit/70dae47f08547f2749afb9ee9dfa805b8a94b028
+
+### Maintenance
+
+ * Remove WebTorrent redundancy support (HLS redundancy is still supported). It hasn't been used in the player for several major versions, so there's no point in continuing to store these video files
+ * Upgrade [p2p-media-loader](https://github.com/novage/p2p-media-loader) to v2
+ * Reduce logging on object storage request error
+ * Introduce `npm run install-node-dependencies` to install PeerTube `yarn` dependencies, so we can easily migrate from `yarn` in the future
+ * Increase image max upload size from 4MB to 8MB
+
+### Configuration
+
+ * Add SepiaSearch URL as default search index. Global search is still disabled by default
+
+### Features
+
+ * :tada: Redesign *About Platform*, *About PeerTube* and *About Network* pages :tada:
+ * Highlight author host in video miniature using a new dropdown component that explains where the content is coming from
+ * Add ability to put video captions in object storage. Use the [CLI](https://docs.joinpeertube.org/maintain/tools#move-video-files-from-filesystem-to-object-storage) after the upgrade to move existing captions to object storage
+ * Add ability for [Mastodon to verify](https://joinmastodon.org/verification) PeerTube links
+ * Enable viewer protocol V2 for better [concurrent viewer scalability](https://joinpeertube.org/news/stress-test-2023)
+ * Add ability for admins to set the default player auto play behaviour [#6167](https://github.com/Chocobozzz/PeerTube/pull/6788)
+ * Improve notification label when a subscription is live streaming
+ * Add *Open in mobile app* button when opening the website using a mobile device (can be disabled in the configuration)
+ * Login, email verification and password reset use a case-insensitive email if they can [#6648](https://github.com/Chocobozzz/PeerTube/pull/6648)
+ * REST API:
+   * Add `host` filter to list videos endpoints
+   * Add `channelUpdatedAt` sort option to list subscriptions endpoint
+   * Add `playlistUrl` metadata to HLS video file JSON representation
+   * Add `typeOneOf` filter to list notifications endpoint
+ * Support `host` filter attribute to `<peertube-videos-list>` custom markup element
+ * Prefer short UUID for embed URLs
+ * Add RSS feed discovery in HTML head tag
+ * Improve channel podcast feed:
+   * Add missing tags so it's now possible to submit the feed to Apple Podcast
+   * Use the audio file as default enclosure if possible
+   * Use the download video file link to generate files that can be easily played by podcast applications
+ * Add video public link to ActivityPub representation to fix federation discoverability issue with short video URL (Akkoma, Sharkey, etc.)
+ * Increase search bar width on big screens
+ * Add `ugc` to `<a>` `rel` attribute to HTML generated by users
+ * Allow simple HTML format in transcription widget
+
+### Bug fixes
+
+ * Fix chapter marker click precision on long videos
+ * Fix HTTP signature key ID
+ * Fix auto block list link in notification email
+ * Add missing localization for admin plugin menu entries
+ * Fix running transcoding on videos that only contain an audio resolution
+ * Fix theme colors in embed and chapter markers visibility
+ * Correctly delete remote thumbnails/previews on update
+ * Don't mark video as transcoded before the audio is available
+ * Fix adding an intro/outro on videos with split HLS streams
+ * Various UI inconsistencies/new theme/contrast fixes
+ * Fix live ending when using remote runners
+ * Fix selecting an entry in a select box after a search
+ * More robust live handler on invalid ffprobe
+ * Respect original frame rate of input file, as stated in max FPS configuration documentation
+ * Don't crash on GeoIP download problem
+ * Fix desynchronized audio/video on live replay
+ * Fix player portrait mode
+ * Fix instance name link width in header
+ * Fix modal text align on mobile
+ * Fix select and tags height consistency
+ * Fix notification loading icon
+ * Fix channel lazy loading in search results
+ * Fix stuck S3 client
+ * Correctly decrease transcription job
+ * Fix header logo link hit box [#6914](https://github.com/Chocobozzz/PeerTube/pull/6914)
+
+
+## v7.0.1
+
+### Features
+
+ * Update translations
+
+### Bug fixes
+
+ * Fix banner/avatar edit buttons
+ * Fix banner margin in channels page
+ * Textarea font size consistency
+ * Fix subscribe button radius
+ * Fix channel avatar info username
+ * Fix maximized markdown textarea
+ * Remove confusing channel message in *My playlists* pages
+ * Fix broken infinite scroll when deleting items (Videos, Channels...)
+ * Fix broadcast message overflow
+ * Fix adding videos in playlist from discover page
+ * Fix my videos edit/delete buttons display
+ * Fix header components overflow in admin log page
+
+
+## v7.0.0
+
+### IMPORTANT NOTES
+
+ * **Classic install only** (for Docker admins see [v6.3 IMPORTANT NOTES](https://github.com/Chocobozzz/PeerTube/releases/tag/v6.3.0)) Ensure you have `storage.original_video_files` set in your configuration file: https://github.com/Chocobozzz/PeerTube/blob/develop/config/production.yaml.example#L159.
+ If you did not configure this key but have already enabled "Keep a version of the input file" configuration, original files may have been saved in `versions/peertube-v6.x.x/storage/original-video-files/` directories. If this is the case, you must move these files in the new directory location specified by your `storage.original_video_files` configuration
+ * Safari desktop versions < 13 are not supported anymore
+ * iOS versions < 14.5 are not supported anymore
+ * PeerTube instance requires python >= 3.8 for transcription
+
+### Docker
+
+ * Fix private IPv6 subnet (we used a subnet reserved for examples)
+
+### Plugins/Themes/Embed API
+
+ * Remove client plugin hooks: `filter:api.recently-added-videos.videos.list.{params,result}`, `filter:api.local-videos.videos.list.{params,result}`, `filter:api.trending-videos.videos.list.{params,result}` `filter:api.trending-videos.videos.list.result` in favour of `filter:api.browse-videos.videos.list.{params,result}`
+ * Header logo doesn't have the `.icon` class anymore (it still has the `icon-logo` class)
+ * All CSS variables have been replaced so it's easier to theme PeerTube:
+   * PeerTube generates a color palette based on a few main colors (`primary`, `fg`, `bg`, `bg-secondary`...): https://github.com/Chocobozzz/PeerTube/blob/develop/client/src/sass/application.scss#L27
+   * Some new variables fallback to old variables to limit theme breaks
+
+### Admin config (non-exhaustive)
+
+ * Ensure `instance.default_client_route` (in web admin -> `Configuration` -> `Basic` -> `Landing page`) has a correct path: `/videos/trending`, `/videos/local` and `/videos/recently-added` have been removed in favour of `/videos/browse`
+ * Add ability to configure STUN servers IPs: `webrtc.stun_servers`
+ * Remove `client.videos.miniature.display_author_avatar` config: author avatars are now always displayed
+
+### Features
+
+ * :tada: Global client redesign :tada:
+    * Introduce a new *Light/Beige* theme that replaces the current one (black/orange)
+    * Add a *Dark/Brown* theme directly in PeerTube core
+    * Split *My library* pages into:
+      * *Video Space* pages (that contains account channels, videos...)
+      * *My library* pages (that contains account playlists, subscriptions...)
+    * Split *Administration* pages into:
+      * *Overview* pages (to list instance users, videos...)
+      * *Moderation* pages (to list abuses, blocks, registrations...)
+      * *Settings* pages (instance configuration, list runners...)
+    * Reorganize the header and the left menu:
+      * Account settings and notifications are now in the header
+      * Add instance name and description in the left menu for anonymous users
+    * Merge *Recently Added* and *Trending* and *Local videos* videos pages into a *Browse videos* page that includes quick filters
+    * Improve *Discover videos* page UX
+    * Redesign the left menu, the horizontal menus, form controls, buttons and video filters panel
+    * Replace/remove/add some icons
+ * :tada: Introduce a modal to easily add/edit/remove subtitle segments :tada:
+ * Improve accessibility:
+   * Fix contrast issues
+   * Add missing labels
+   * Fix progress bar, custom select components, tag input components, notification component accessibility
+   * Add underlining to links
+   * Add "skip menu" links
+   * Improve keyboard navigation
+   * Fix various screen readers issues
+ * Add Slovakian language support to the client
+ * SEO:
+   * Add instance avatar to OpenGraph tags
+   * Hide empty accounts/channels from sitemap [#6633](https://github.com/Chocobozzz/PeerTube/pull/6633)
+   * Inject additional video tags to sitemap [#6633](https://github.com/Chocobozzz/PeerTube/pull/6633)
+ * Various UX improvements:
+   * Improve player control bar responsive
+   * Add refresh button to following list
+   * Clearer signup limit label
+   * Add `0.25` playback rate in player
+
+### Bug fixes
+
+ * Fix *My channel* search
+ * Fix channel sync edition/listing
+ * Fix adding video tags on Android
+ * Fix fetching client comment URL using ActivityPub resolver (Mastodon search bar...)
+ * Fix crash when logging SQL requests and enabled prettify option
+ * Correctly delete web videos with hls without audio
+ * Fix auto blacklisting unlisted videos
+ * Fix *ERR_BUFFER_OUT_OF_BOUNDS* error on some node version
+ * Add ability to set max channel sync in admin config
+ * Allow plugins to pass client params when listing videos (`filter:api.browse-videos.videos.list.params` hook)
+ * Respect user export expiration admin configuration
+ * Fix studio edition on an audio only file
+ * Fix embed crash on telegram web browser
+
+
+## v6.3.3
+
+### Bug fixes
+
+ * Fix broken thumbnails on live replay
+ * Fix detecting portrait rotation of some video
+ * Don't allow to select a frame from a live to set the thumbnail
+ * Fix lost video stream with specific transcoding settings and video input
+ * Fix creating playlist without thumbnail when using the REST API
+ * Fix `.mov` video upload on some Windows versions
+ * Fix `video-plugin-metadata.result` client plugin hook
+
+
+## v6.3.2
+
+### Bug fixes
+
+ * Fix 403 error when downloading private/internal video
+ * Don't crash video federation and live replay generation on missing thumbnail/preview
+ * Fix advanced search input with multiple automatic search tokens
+ * Fix player "Copy URL" when the video is fullscreen
+ * Fix account videos search
+ * Add missing max transcoding fps config in admin
+ * Don't add mobile buttons if the player controls are disabled
+
+
+## v6.3.1
+
+### IMPORTANT NOTES
+
+  * If you upgrade from PeerTube **< v6.3.0**, please follow v6.3.0 IMPORTANT NOTES
+
+### Bug fixes
+
+  * Fix player settings button on mobile
+  * Fix removed audio when splitting audio and video streams on existing videos when running HLS transcoding
+
+
+## v6.3.0
+
+### IMPORTANT NOTES
+
+ * **Important** You need to manually execute a migration script after your upgrade while PeerTube is running and the database migration is complete (`Migrations finished. New migration version schema: 865` in PeerTube startup logs, this migration script may take a while).
+ The purpose of this migration is to update video files metadata in the database.
+ This migration can take a long time if you have many federated/local videos, but is designed to be safe to run multiple times:
+   * Classic installation: `cd /var/www/peertube/peertube-latest && sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production node dist/scripts/migrations/peertube-6.3.js`
+   * Docker installation: `cd /var/www/peertube-docker && docker compose exec -u peertube peertube node dist/scripts/migrations/peertube-6.3.js`
+ * **Important for Docker admins** If you enabled the "Keep a version of the input file" configuration, files may have been stored in the container instead of the host volume. To prevent data loss, you must **copy** the files on the host before upgrading using `docker compose cp peertube:/app/storage/original-video-files docker-volume/data`
+
+### Docker
+
+  * Fix IPV6 configuration. You must update your [`docker-compose.yml` file](https://github.com/Chocobozzz/PeerTube/commit/ccfd57e349c8bed557d6a60007f92f45d40879e3):
+    * Remove `version:` line
+    * Add `ipv6_address` to `peertube.networks.default` key
+    * Update `network` top level key content
+
+### Maintenance
+
+  * Reduce error and warning logs generated by clients and the federation
+  * Introduce `peertube_playback_buffer_stalled_count_total` OpenTelemetry playback metric
+  * Removed `access_log: off` for static video requests in the nginx configuration template, now the player doesn't use WebTorrent anymore (which was doing a large amount of small HTTP requests)
+  * PeerTube introduces a new download API endpoint that remuxes the videos on the fly to merge video and audio streams. A custom rate limit can be configured in the YAML configuration
+
+### Plugins/Themes/Embed API
+
+  * Reduce `@peertube/peertube-types` package size
+
+### Features
+
+  * :tada: Separate HLS audio and video streams :tada:
+    * Can be enabled for VODs in the admin configuration for new videos
+    * Automatically enabled for lives
+    * If enabled, an "Audio only" resolution is available in the HLS player
+    * The live can ingest and output an "Audio only" stream
+    * Reduce video disk space used since we only store one version of the audio stream
+    * The download modal has a new panel so users can easily select the resolution they want to download
+  * :tada: Introduce a transcription widget :tada:
+    * Users can open the transcription widget that appears next to the player
+    * The transcription is in sync with the video
+    * Users can search the transcript and click on a specific segment to automatically jump the video to the appropriate timecode
+  * UI/UX:
+    * More visible chapter markers in player control bar
+    * Add a button to copy server logs in admin
+    * Smoother live autoplay: only the player is reloaded
+    * Improve channel and account page tab title
+    * Better resolution label for custom video aspect. For example with a `1920x816` video, we now display `1080p` instead of `816p`
+  * Support max FPS configuration: the admin can allow videos with more than 60FPS, which is the current default limit
+  * Max resolution file preserves input FPS even if < 720p, allowing users to upload and broadcast a 480p resolution at 60FPS
+  * Add ability for admins to set multiple proxies for youtube-dl that PeerTube will randomly select
+  * Support youtube-dl executable (for example *Linux standalone x64 binary* that includes additional features like [impersonation](https://github.com/yt-dlp/yt-dlp/?tab=readme-ov-file#impersonation))
+  * Add a cover to the file if the user only downloads the audio version of the video
+  * Forward watch page `start` query param to the OEmbed service so that the embed starts at the correct time
+  * Notify local users on when an *Internal* video is published
+  * Add ability for admins to disable federation (disabling ActivityPub endpoints)
+  * Improve local video search relevance
+
+### Bug fixes
+
+  * Fix broken object storage playlist on file removal
+  * Set live tags to replays
+  * Fix hidden delete button for original file in videos admin overview
+  * Don't crash the embed on player error
+  * Prevent embed poster flickering
+  * Fix left menu block title ellipsis
+  * Fix channel name overflow in *My Videos" page
+  * Fix player infinite buffering issues on fast live re-stream
+  * Don't display orange resume bar on live miniatures
+  * Fix video file object storage detection in admin videos overview
+  * Support ActivityPub remote actors with array `url` field
+  * Fix resetting duration filter in search page
+  * Use first step *Public* privacy when publishing lives without having validated the second step
+  * Fix studio page responsive
+  * Add CORS to oEmbed API
+  * Fix storyboard display at the end of the video
+  * Correctly cleanup permanent live empty directories
+  * Fix duplicated resolutions when capping fps
+  * Don't resize remote actor images with unknown size
+  * More robust caption update concurrency
+
+
 ## v6.2.1
 
 ### Maintenance

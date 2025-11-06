@@ -1,5 +1,5 @@
 import { mapValues, pickBy } from 'lodash-es'
-import { Component, OnInit, ViewChild } from '@angular/core'
+import { Component, OnInit, inject, viewChild } from '@angular/core'
 import { Notifier } from '@app/core'
 import { ABUSE_REASON_VALIDATOR } from '@app/shared/form-validators/abuse-validators'
 import { FormReactive } from '@app/shared/shared-forms/form-reactive'
@@ -9,7 +9,7 @@ import { NgbModalRef } from '@ng-bootstrap/ng-bootstrap/modal/modal-ref'
 import { abusePredefinedReasonsMap } from '@peertube/peertube-core-utils'
 import { AbusePredefinedReasonsString } from '@peertube/peertube-models'
 import { AbuseService } from '../abuse.service'
-import { PeerTubeTemplateDirective } from '../../shared-main/angular/peertube-template.directive'
+import { PeerTubeTemplateDirective } from '../../shared-main/common/peertube-template.directive'
 import { PeertubeCheckboxComponent } from '../../shared-forms/peertube-checkbox.component'
 import { NgFor, NgIf, NgClass } from '@angular/common'
 import { FormsModule, ReactiveFormsModule } from '@angular/forms'
@@ -20,7 +20,6 @@ import { Account } from '@app/shared/shared-main/account/account.model'
   selector: 'my-account-report',
   templateUrl: './report.component.html',
   styleUrls: [ './report.component.scss' ],
-  standalone: true,
   imports: [
     GlobalIconComponent,
     FormsModule,
@@ -33,7 +32,12 @@ import { Account } from '@app/shared/shared-main/account/account.model'
   ]
 })
 export class AccountReportComponent extends FormReactive implements OnInit {
-  @ViewChild('modal', { static: true }) modal: NgbModal
+  protected formReactiveService = inject(FormReactiveService)
+  private modalService = inject(NgbModal)
+  private abuseService = inject(AbuseService)
+  private notifier = inject(Notifier)
+
+  readonly modal = viewChild<NgbModal>('modal')
 
   error: string = null
   predefinedReasons: { id: AbusePredefinedReasonsString, label: string, description?: string, help?: string }[] = []
@@ -41,15 +45,6 @@ export class AccountReportComponent extends FormReactive implements OnInit {
   account: Account = null
 
   private openedModal: NgbModalRef
-
-  constructor (
-    protected formReactiveService: FormReactiveService,
-    private modalService: NgbModal,
-    private abuseService: AbuseService,
-    private notifier: Notifier
-  ) {
-    super()
-  }
 
   get currentHost () {
     return window.location.host
@@ -66,7 +61,7 @@ export class AccountReportComponent extends FormReactive implements OnInit {
   ngOnInit () {
     this.buildForm({
       reason: ABUSE_REASON_VALIDATOR,
-      predefinedReasons: mapValues(abusePredefinedReasonsMap, r => null)
+      predefinedReasons: mapValues(abusePredefinedReasonsMap, _ => null as any)
     })
 
     this.predefinedReasons = this.abuseService.getPrefefinedReasons('account')
@@ -77,7 +72,7 @@ export class AccountReportComponent extends FormReactive implements OnInit {
 
     this.modalTitle = $localize`Report ${this.account.displayName}`
 
-    this.openedModal = this.modalService.open(this.modal, { centered: true, keyboard: false, size: 'lg' })
+    this.openedModal = this.modalService.open(this.modal(), { centered: true, keyboard: false, size: 'lg' })
   }
 
   hide () {

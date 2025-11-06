@@ -10,6 +10,7 @@ import { ServerBlocklistModel } from '@server/models/server/server-blocklist.js'
 import { ServerModel } from '@server/models/server/server.js'
 import { TrackerModel } from '@server/models/server/tracker.js'
 import { UserVideoHistoryModel } from '@server/models/user/user-video-history.js'
+import { VideoLiveScheduleModel } from '@server/models/video/video-live-schedule.js'
 import { VideoSourceModel } from '@server/models/video/video-source.js'
 import { ScheduleVideoUpdateModel } from '../../../schedule-video-update.js'
 import { TagModel } from '../../../tag.js'
@@ -25,15 +26,13 @@ import { VideoTableAttributes } from './video-table-attributes.js'
 type SQLRow = { [id: string]: string | number }
 
 /**
- *
  * Build video models from SQL rows
- *
  */
 
 export class VideoModelBuilder {
-  private videosMemo: { [ id: number ]: VideoModel }
-  private videoStreamingPlaylistMemo: { [ id: number ]: VideoStreamingPlaylistModel }
-  private videoFileMemo: { [ id: number ]: VideoFileModel }
+  private videosMemo: { [id: number]: VideoModel }
+  private videoStreamingPlaylistMemo: { [id: number]: VideoStreamingPlaylistModel }
+  private videoFileMemo: { [id: number]: VideoFileModel }
 
   private thumbnailsDone: Set<any>
   private actorImagesDone: Set<any>
@@ -43,6 +42,7 @@ export class VideoModelBuilder {
   private serverBlocklistDone: Set<any>
   private liveDone: Set<any>
   private sourceDone: Set<any>
+  private liveScheduleDone: Set<any>
   private redundancyDone: Set<any>
   private scheduleVideoUpdateDone: Set<any>
 
@@ -58,7 +58,6 @@ export class VideoModelBuilder {
     private readonly mode: 'get' | 'list',
     private readonly tables: VideoTableAttributes
   ) {
-
   }
 
   buildVideosFromRows (options: {
@@ -78,6 +77,8 @@ export class VideoModelBuilder {
 
       this.setUserHistory(row, videoModel)
       this.addThumbnail(row, videoModel)
+      this.setLive(row, videoModel)
+      this.addLiveSchedule(row, videoModel)
 
       const channelActor = videoModel.VideoChannel?.Actor
       if (channelActor) {
@@ -103,7 +104,6 @@ export class VideoModelBuilder {
         this.addTracker(row, videoModel)
         this.setBlacklisted(row, videoModel)
         this.setScheduleVideoUpdate(row, videoModel)
-        this.setLive(row, videoModel)
       } else {
         if (include & VideoInclude.BLACKLISTED) {
           this.setBlacklisted(row, videoModel)
@@ -114,12 +114,20 @@ export class VideoModelBuilder {
           this.setBlockedServer(row, videoModel)
         }
 
+        if (include & VideoInclude.NOT_PUBLISHED_STATE) {
+          this.setScheduleVideoUpdate(row, videoModel)
+        }
+
         if (include & VideoInclude.SOURCE) {
           this.setSource(row, videoModel)
         }
 
         if (include & VideoInclude.AUTOMATIC_TAGS) {
           this.addAutoTag(row, videoModel)
+        }
+
+        if (include & VideoInclude.TAGS) {
+          this.addTag(row, videoModel)
         }
       }
     }
@@ -143,6 +151,7 @@ export class VideoModelBuilder {
     this.sourceDone = new Set()
     this.redundancyDone = new Set()
     this.scheduleVideoUpdateDone = new Set()
+    this.liveScheduleDone = new Set()
 
     this.accountBlocklistDone = new Set()
     this.serverBlocklistDone = new Set()
@@ -163,7 +172,6 @@ export class VideoModelBuilder {
 
       const videoModel = this.videosMemo[row.id]
       this.addWebVideoFile(row, videoModel)
-      this.addRedundancy(row, 'VideoFiles', this.videoFileMemo[id])
     }
   }
 
@@ -310,7 +318,7 @@ export class VideoModelBuilder {
     this.videoFileMemo[id] = videoFileModel
   }
 
-  private addRedundancy (row: SQLRow, prefix: string, to: VideoFileModel | VideoStreamingPlaylistModel) {
+  private addRedundancy (row: SQLRow, prefix: string, to: VideoStreamingPlaylistModel) {
     if (!to.RedundancyVideos) to.RedundancyVideos = []
 
     const redundancyPrefix = `${prefix}.RedundancyVideos`
@@ -424,6 +432,24 @@ export class VideoModelBuilder {
     this.liveDone.add(id)
   }
 
+  private addLiveSchedule (row: SQLRow, videoModel: VideoModel) {
+    const id = row['VideoLive.VideoLiveSchedules.id']
+    if (!id) return
+    if (this.liveScheduleDone.has(id)) return
+
+    const videoLiveScheduleAttributes = this.grab(row, this.tables.getLiveScheduleAttributes(), 'VideoLive.VideoLiveSchedules')
+
+    const liveScheduleModel = new VideoLiveScheduleModel(videoLiveScheduleAttributes, this.buildOpts)
+
+    if (!videoModel.VideoLive.LiveSchedules) {
+      videoModel.VideoLive.LiveSchedules = []
+    }
+
+    videoModel.VideoLive.LiveSchedules.push(liveScheduleModel)
+
+    this.liveScheduleDone.add(id)
+  }
+
   private setSource (row: SQLRow, videoModel: VideoModel) {
     const id = row['VideoSource.id']
     if (!id || this.sourceDone.has(id)) return
@@ -435,7 +461,7 @@ export class VideoModelBuilder {
   }
 
   private grab (row: SQLRow, attributes: string[], prefix: string) {
-    const result: { [ id: string ]: string | number } = {}
+    const result: { [id: string]: string | number } = {}
 
     for (const a of attributes) {
       const key = prefix

@@ -5,6 +5,7 @@ import {
   HttpStatusCode,
   ListRunnerJobsQuery,
   LiveRTMPHLSTranscodingUpdatePayload,
+  RequestRunnerJobBody,
   RequestRunnerJobResult,
   RunnerJobState,
   RunnerJobSuccessBody,
@@ -14,6 +15,7 @@ import {
   RunnerJobUpdatePayload,
   ServerErrorCode,
   TranscriptionSuccess,
+  GenerateStoryboardSuccess,
   UserRight,
   VODAudioMergeTranscodingSuccess,
   VODHLSTranscodingSuccess,
@@ -45,6 +47,7 @@ import {
   getRunnerFromTokenValidator,
   jobOfRunnerGetValidatorFactory,
   listRunnerJobsValidator,
+  requestRunnerJobValidator,
   runnerJobGetValidator,
   successRunnerJobValidator,
   updateRunnerJobValidator
@@ -54,8 +57,13 @@ import { RunnerModel } from '@server/models/runner/runner.js'
 import express, { UploadFiles } from 'express'
 
 const postRunnerJobSuccessVideoFiles = createReqFiles(
-  [ 'payload[videoFile]', 'payload[resolutionPlaylistFile]', 'payload[vttFile]' ],
-  { ...MIMETYPES.VIDEO.MIMETYPE_EXT, ...MIMETYPES.M3U8.MIMETYPE_EXT, ...MIMETYPES.VIDEO_CAPTIONS.MIMETYPE_EXT }
+  [ 'payload[videoFile]', 'payload[resolutionPlaylistFile]', 'payload[vttFile]', 'payload[storyboardFile]' ],
+  {
+    ...MIMETYPES.VIDEO.MIMETYPE_EXT,
+    ...MIMETYPES.M3U8.MIMETYPE_EXT,
+    ...MIMETYPES.VIDEO_CAPTIONS.MIMETYPE_EXT,
+    ...MIMETYPES.IMAGE.MIMETYPE_EXT
+  }
 )
 
 const runnerJobUpdateVideoFiles = createReqFiles(
@@ -71,13 +79,16 @@ const runnerJobsRouter = express.Router()
 // Controllers for runners
 // ---------------------------------------------------------------------------
 
-runnerJobsRouter.post('/jobs/request',
+runnerJobsRouter.post(
+  '/jobs/request',
   apiRateLimiter,
+  requestRunnerJobValidator,
   asyncMiddleware(getRunnerFromTokenValidator),
   asyncMiddleware(requestRunnerJob)
 )
 
-runnerJobsRouter.post('/jobs/:jobUUID/accept',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/accept',
   apiRateLimiter,
   asyncMiddleware(runnerJobGetValidator),
   acceptRunnerJobValidator,
@@ -85,14 +96,16 @@ runnerJobsRouter.post('/jobs/:jobUUID/accept',
   asyncMiddleware(acceptRunnerJob)
 )
 
-runnerJobsRouter.post('/jobs/:jobUUID/abort',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/abort',
   apiRateLimiter,
   asyncMiddleware(jobOfRunnerGetValidatorFactory([ RunnerJobState.PROCESSING ])),
   abortRunnerJobValidator,
   asyncMiddleware(abortRunnerJob)
 )
 
-runnerJobsRouter.post('/jobs/:jobUUID/update',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/update',
   runnerJobUpdateVideoFiles,
   apiRateLimiter, // Has to be after multer middleware to parse runner token
   asyncMiddleware(jobOfRunnerGetValidatorFactory([ RunnerJobState.PROCESSING, RunnerJobState.COMPLETING, RunnerJobState.COMPLETED ])),
@@ -100,13 +113,15 @@ runnerJobsRouter.post('/jobs/:jobUUID/update',
   asyncMiddleware(updateRunnerJobController)
 )
 
-runnerJobsRouter.post('/jobs/:jobUUID/error',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/error',
   asyncMiddleware(jobOfRunnerGetValidatorFactory([ RunnerJobState.PROCESSING ])),
   errorRunnerJobValidator,
   asyncMiddleware(errorRunnerJob)
 )
 
-runnerJobsRouter.post('/jobs/:jobUUID/success',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/success',
   postRunnerJobSuccessVideoFiles,
   apiRateLimiter, // Has to be after multer middleware to parse runner token
   asyncMiddleware(jobOfRunnerGetValidatorFactory([ RunnerJobState.PROCESSING ])),
@@ -118,7 +133,8 @@ runnerJobsRouter.post('/jobs/:jobUUID/success',
 // Controllers for admins
 // ---------------------------------------------------------------------------
 
-runnerJobsRouter.post('/jobs/:jobUUID/cancel',
+runnerJobsRouter.post(
+  '/jobs/:jobUUID/cancel',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_RUNNERS),
   asyncMiddleware(runnerJobGetValidator),
@@ -126,7 +142,8 @@ runnerJobsRouter.post('/jobs/:jobUUID/cancel',
   asyncMiddleware(cancelRunnerJob)
 )
 
-runnerJobsRouter.get('/jobs',
+runnerJobsRouter.get(
+  '/jobs',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_RUNNERS),
   paginationValidator,
@@ -137,7 +154,8 @@ runnerJobsRouter.get('/jobs',
   asyncMiddleware(listRunnerJobs)
 )
 
-runnerJobsRouter.delete('/jobs/:jobUUID',
+runnerJobsRouter.delete(
+  '/jobs/:jobUUID',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_RUNNERS),
   asyncMiddleware(runnerJobGetValidator),
@@ -158,7 +176,8 @@ export {
 
 async function requestRunnerJob (req: express.Request, res: express.Response) {
   const runner = res.locals.runner
-  const availableJobs = await RunnerJobModel.listAvailableJobs()
+  const body = req.body as RequestRunnerJobBody
+  const availableJobs = await RunnerJobModel.listAvailableJobs(body.jobTypes)
 
   logger.debug('Runner %s requests for a job.', runner.name, { availableJobs, ...lTags(runner.name) })
 
@@ -168,6 +187,11 @@ async function requestRunnerJob (req: express.Request, res: express.Response) {
       type: j.type,
       payload: j.payload
     }))
+  }
+
+  if (body.version && runner.version !== body.version) {
+    runner.version = body.version
+    await runner.save()
   }
 
   updateLastRunnerContact(req, runner)
@@ -216,7 +240,10 @@ async function acceptRunnerJob (req: express.Request, res: express.Response) {
   updateLastRunnerContact(req, runner)
 
   logger.info(
-    'Remote runner %s has accepted job %s (%s)', runner.name, runnerJob.uuid, runnerJob.type,
+    'Remote runner %s has accepted job %s (%s)',
+    runner.name,
+    runnerJob.uuid,
+    runnerJob.type,
     lTags(runner.name, runnerJob.uuid, runnerJob.type)
   )
 
@@ -229,7 +256,10 @@ async function abortRunnerJob (req: express.Request, res: express.Response) {
   const body: AbortRunnerJobBody = req.body
 
   logger.info(
-    'Remote runner %s is aborting job %s (%s)', runner.name, runnerJob.uuid, runnerJob.type,
+    'Remote runner %s is aborting job %s (%s)',
+    runner.name,
+    runnerJob.uuid,
+    runnerJob.type,
     { reason: body.reason, ...lTags(runner.name, runnerJob.uuid, runnerJob.type) }
   )
 
@@ -249,7 +279,10 @@ async function errorRunnerJob (req: express.Request, res: express.Response) {
   runnerJob.failures += 1
 
   logger.error(
-    'Remote runner %s had an error with job %s (%s)', runner.name, runnerJob.uuid, runnerJob.type,
+    'Remote runner %s had an error with job %s (%s)',
+    runner.name,
+    runnerJob.uuid,
+    runnerJob.type,
     { errorMessage: body.message, totalFailures: runnerJob.failures, ...lTags(runner.name, runnerJob.uuid, runnerJob.type) }
   )
 
@@ -292,7 +325,10 @@ async function updateRunnerJobController (req: express.Request, res: express.Res
     : undefined
 
   logger.debug(
-    'Remote runner %s is updating job %s (%s)', runnerJob.Runner.name, runnerJob.uuid, runnerJob.type,
+    'Remote runner %s is updating job %s (%s)',
+    runnerJob.Runner.name,
+    runnerJob.uuid,
+    runnerJob.type,
     { body, updatePayload, ...lTags(runner.name, runnerJob.uuid, runnerJob.type) }
   )
 
@@ -354,6 +390,14 @@ const jobSuccessPayloadBuilders: {
 
       vttFile: files['payload[vttFile]'][0].path
     }
+  },
+
+  'generate-video-storyboard': (payload: GenerateStoryboardSuccess, files) => {
+    return {
+      ...payload,
+
+      storyboardFile: files['payload[storyboardFile]'][0].path
+    }
   }
 }
 
@@ -365,7 +409,10 @@ async function postRunnerJobSuccess (req: express.Request, res: express.Response
   const resultPayload = jobSuccessPayloadBuilders[runnerJob.type](body.payload, req.files as UploadFiles)
 
   logger.info(
-    'Remote runner %s is sending success result for job %s (%s)', runnerJob.Runner.name, runnerJob.uuid, runnerJob.type,
+    'Remote runner %s is sending success result for job %s (%s)',
+    runnerJob.Runner.name,
+    runnerJob.uuid,
+    runnerJob.type,
     { resultPayload, ...lTags(runner.name, runnerJob.uuid, runnerJob.type) }
   )
 

@@ -46,9 +46,7 @@ describe('Test follow constraints', function () {
   })
 
   describe('With a followed instance', function () {
-
     describe('With an unlogged user', function () {
-
       it('Should get the local video', async function () {
         await servers[0].videos.get({ id: video1UUID })
       })
@@ -130,7 +128,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('With a non followed instance', function () {
-
     before(async function () {
       this.timeout(30000)
 
@@ -138,7 +135,6 @@ describe('Test follow constraints', function () {
     })
 
     describe('With an unlogged user', function () {
-
       it('Should get the local video', async function () {
         await servers[0].videos.get({ id: video1UUID })
       })
@@ -152,7 +148,6 @@ describe('Test follow constraints', function () {
         expect(error.code).to.equal(ServerErrorCode.DOES_NOT_RESPECT_FOLLOW_CONSTRAINTS)
 
         expect(error.detail).to.equal('Cannot get this video regarding follow constraints')
-        expect(error.error).to.equal(error.detail)
 
         expect(error.status).to.equal(HttpStatusCode.FORBIDDEN_403)
 
@@ -197,7 +192,6 @@ describe('Test follow constraints', function () {
     })
 
     describe('With a logged user', function () {
-
       it('Should get the local video', async function () {
         await servers[0].videos.getWithToken({ token: userToken, id: video1UUID })
       })
@@ -239,7 +233,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('When following a remote account', function () {
-
     before(async function () {
       this.timeout(60000)
 
@@ -257,7 +250,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('When unfollowing a remote account', function () {
-
     before(async function () {
       this.timeout(60000)
 
@@ -278,7 +270,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('When following a remote channel', function () {
-
     before(async function () {
       this.timeout(60000)
 
@@ -296,7 +287,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('When unfollowing a remote channel', function () {
-
     before(async function () {
       this.timeout(60000)
 
@@ -317,7 +307,6 @@ describe('Test follow constraints', function () {
   })
 
   describe('When disabling federation', function () {
-
     before(async function () {
       this.timeout(60_000)
 

@@ -1,7 +1,7 @@
-@use 'sass:math';
-@use '_variables' as *;
-@use '_mixins' as *;
-@use '_miniature' as *;
+@use "sass:math";
+@use "_variables" as *;
+@use "_mixins" as *;
+@use "_miniature" as *;
 
 .moderation-expanded {
   font-size: 90%;
@@ -33,22 +33,17 @@
     max-width: 500px;
   }
 
-  @media screen and (max-width: $primeng-breakpoint) {
+  @media screen and (max-width: $medium-view) {
     .right {
       width: 100%;
     }
   }
 }
 
-my-action-dropdown.show {
-  ::ng-deep .dropdown-root {
-    display: block !important;
-  }
-}
-
 .table-comment-link,
 .table-account-link {
-  color: var(--mainForegroundColor);
+  text-decoration: none;
+  color: pvar(--fg);
 
   @include disable-outline;
 
@@ -66,7 +61,7 @@ my-abuse-details {
   width: 100%;
 }
 
-@media screen and (max-width: $primeng-breakpoint) {
+@media screen and (max-width: $medium-view) {
   .abuse-messages {
     justify-content: flex-start !important;
   }

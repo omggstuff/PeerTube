@@ -1,17 +1,21 @@
-import { Account, AccountSummary } from '@peertube/peertube-models'
+import { Account, AccountSummary, ActivityPubActor, VideoPrivacy } from '@peertube/peertube-models'
+import { AttributesOnly } from '@peertube/peertube-typescript-utils'
 import { ModelCache } from '@server/models/shared/model-cache.js'
-import { FindOptions, IncludeOptions, Includeable, Op, Transaction, WhereOptions } from 'sequelize'
+import { FindOptions, IncludeOptions, Includeable, Op, Transaction, WhereOptions, literal } from 'sequelize'
 import {
+  AfterDestroy,
   AllowNull,
   BeforeDestroy,
-  BelongsTo, Column,
+  BelongsTo,
+  Column,
   CreatedAt,
   DataType,
   Default,
   DefaultScope,
   ForeignKey,
   HasMany,
-  Is, Scopes,
+  Is,
+  Scopes,
   Table,
   UpdatedAt
 } from 'sequelize-typescript'
@@ -19,24 +23,27 @@ import { isAccountDescriptionValid } from '../../helpers/custom-validators/accou
 import { CONSTRAINTS_FIELDS, SERVER_ACTOR_NAME, WEBSERVER } from '../../initializers/constants.js'
 import { sendDeleteActor } from '../../lib/activitypub/send/send-delete.js'
 import {
-  MAccount, MAccountAP,
+  MAccount,
+  MAccountAP,
   MAccountDefault,
   MAccountFormattable,
   MAccountHost,
+  MAccountIdHost,
   MAccountSummaryFormattable,
-  MChannelHost
+  MChannelIdHost
 } from '../../types/models/index.js'
 import { ActorFollowModel } from '../actor/actor-follow.js'
 import { ActorImageModel } from '../actor/actor-image.js'
-import { ActorModel } from '../actor/actor.js'
+import { ActorModel, actorSummaryAttributes } from '../actor/actor.js'
 import { ApplicationModel } from '../application/application.js'
 import { AccountAutomaticTagPolicyModel } from '../automatic-tag/account-automatic-tag-policy.js'
 import { CommentAutomaticTagModel } from '../automatic-tag/comment-automatic-tag.js'
 import { VideoAutomaticTagModel } from '../automatic-tag/video-automatic-tag.js'
 import { ServerBlocklistModel } from '../server/server-blocklist.js'
-import { ServerModel } from '../server/server.js'
+import { ServerModel, serverSummaryAttributes } from '../server/server.js'
 import { SequelizeModel, buildSQLAttributes, getSort, throwIfNotValid } from '../shared/index.js'
 import { UserModel } from '../user/user.js'
+import { VideoChannelCollaboratorModel } from '../video/video-channel-collaborator.js'
 import { VideoChannelModel } from '../video/video-channel.js'
 import { VideoCommentModel } from '../video/video-comment.js'
 import { VideoPlaylistModel } from '../video/video-playlist.js'
@@ -46,6 +53,8 @@ import { AccountBlocklistModel } from './account-blocklist.js'
 export enum ScopeNames {
   SUMMARY = 'SUMMARY'
 }
+
+const accountSummaryAttributes = [ 'id', 'name', 'actorId' ] as const satisfies (keyof AttributesOnly<AccountModel>)[]
 
 export type SummaryOptions = {
   actorRequired?: boolean // Default: true
@@ -66,14 +75,14 @@ export type SummaryOptions = {
 @Scopes(() => ({
   [ScopeNames.SUMMARY]: (options: SummaryOptions = {}) => {
     const serverInclude: IncludeOptions = {
-      attributes: [ 'host' ],
+      attributes: serverSummaryAttributes,
       model: ServerModel.unscoped(),
       required: !!options.whereServer,
       where: options.whereServer
     }
 
     const actorInclude: Includeable = {
-      attributes: [ 'id', 'preferredUsername', 'url', 'serverId' ],
+      attributes: actorSummaryAttributes,
       model: ActorModel.unscoped(),
       required: options.actorRequired ?? true,
       where: options.whereActor,
@@ -93,7 +102,7 @@ export type SummaryOptions = {
     ]
 
     const query: FindOptions = {
-      attributes: [ 'id', 'name', 'actorId' ]
+      attributes: accountSummaryAttributes
     }
 
     if (options.withAccountBlockerIds) {
@@ -144,26 +153,25 @@ export type SummaryOptions = {
   ]
 })
 export class AccountModel extends SequelizeModel<AccountModel> {
-
   @AllowNull(false)
   @Column
-  name: string
+  declare name: string
 
   @AllowNull(true)
   @Default(null)
   @Is('AccountDescription', value => throwIfNotValid(value, isAccountDescriptionValid, 'description', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.USERS.DESCRIPTION.max))
-  description: string
+  declare description: string
 
   @CreatedAt
-  createdAt: Date
+  declare createdAt: Date
 
   @UpdatedAt
-  updatedAt: Date
+  declare updatedAt: Date
 
   @ForeignKey(() => ActorModel)
   @Column
-  actorId: number
+  declare actorId: number
 
   @BelongsTo(() => ActorModel, {
     foreignKey: {
@@ -171,11 +179,11 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     },
     onDelete: 'cascade'
   })
-  Actor: Awaited<ActorModel>
+  declare Actor: Awaited<ActorModel>
 
   @ForeignKey(() => UserModel)
   @Column
-  userId: number
+  declare userId: number
 
   @BelongsTo(() => UserModel, {
     foreignKey: {
@@ -183,11 +191,11 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     },
     onDelete: 'cascade'
   })
-  User: Awaited<UserModel>
+  declare User: Awaited<UserModel>
 
   @ForeignKey(() => ApplicationModel)
   @Column
-  applicationId: number
+  declare applicationId: number
 
   @BelongsTo(() => ApplicationModel, {
     foreignKey: {
@@ -195,7 +203,7 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     },
     onDelete: 'cascade'
   })
-  Application: Awaited<ApplicationModel>
+  declare Application: Awaited<ApplicationModel>
 
   @HasMany(() => VideoChannelModel, {
     foreignKey: {
@@ -204,7 +212,7 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     onDelete: 'cascade',
     hooks: true
   })
-  VideoChannels: Awaited<VideoChannelModel>[]
+  declare VideoChannels: Awaited<VideoChannelModel>[]
 
   @HasMany(() => VideoPlaylistModel, {
     foreignKey: {
@@ -213,7 +221,7 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     onDelete: 'cascade',
     hooks: true
   })
-  VideoPlaylists: Awaited<VideoPlaylistModel>[]
+  declare VideoPlaylists: Awaited<VideoPlaylistModel>[]
 
   @HasMany(() => VideoCommentModel, {
     foreignKey: {
@@ -222,7 +230,7 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     onDelete: 'cascade',
     hooks: true
   })
-  VideoComments: Awaited<VideoCommentModel>[]
+  declare VideoComments: Awaited<VideoCommentModel>[]
 
   @HasMany(() => AccountBlocklistModel, {
     foreignKey: {
@@ -232,7 +240,7 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     as: 'BlockedBy',
     onDelete: 'CASCADE'
   })
-  BlockedBy: Awaited<AccountBlocklistModel>[]
+  declare BlockedBy: Awaited<AccountBlocklistModel>[]
 
   @HasMany(() => AccountAutomaticTagPolicyModel, {
     foreignKey: {
@@ -241,19 +249,25 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     },
     onDelete: 'cascade'
   })
-  AccountAutomaticTagPolicies: Awaited<AccountAutomaticTagPolicyModel>[]
+  declare AccountAutomaticTagPolicies: Awaited<AccountAutomaticTagPolicyModel>[]
 
   @HasMany(() => CommentAutomaticTagModel, {
     foreignKey: 'accountId',
     onDelete: 'CASCADE'
   })
-  CommentAutomaticTags: Awaited<CommentAutomaticTagModel>[]
+  declare CommentAutomaticTags: Awaited<CommentAutomaticTagModel>[]
 
   @HasMany(() => VideoAutomaticTagModel, {
     foreignKey: 'accountId',
     onDelete: 'CASCADE'
   })
-  VideoAutomaticTags: Awaited<VideoAutomaticTagModel>[]
+  declare VideoAutomaticTags: Awaited<VideoAutomaticTagModel>[]
+
+  @HasMany(() => VideoChannelCollaboratorModel, {
+    foreignKey: 'accountId',
+    onDelete: 'CASCADE'
+  })
+  declare VideoChannelCollaborators: Awaited<VideoChannelCollaboratorModel>[]
 
   @BeforeDestroy
   static async sendDeleteIfOwned (instance: AccountModel, options) {
@@ -263,11 +277,23 @@ export class AccountModel extends SequelizeModel<AccountModel> {
 
     await ActorFollowModel.removeFollowsOf(instance.Actor.id, options.transaction)
 
-    if (instance.isOwned()) {
+    if (instance.isLocal()) {
       return sendDeleteActor(instance.Actor, options.transaction)
     }
 
     return undefined
+  }
+
+  @AfterDestroy
+  static async deleteActorIfRemote (instance: AccountModel, options) {
+    if (!instance.Actor) {
+      instance.Actor = await instance.$get('Actor', { transaction: options.transaction })
+    }
+
+    // Remote actor, delete it
+    if (instance.Actor.serverId) {
+      await instance.Actor.destroy({ transaction: options.transaction })
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -280,14 +306,23 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     })
   }
 
+  static getSQLSummaryAttributes (tableName: string, aliasPrefix = '') {
+    return buildSQLAttributes({
+      model: this,
+      tableName,
+      aliasPrefix,
+      includeAttributes: accountSummaryAttributes
+    })
+  }
+
   // ---------------------------------------------------------------------------
 
   static load (id: number, transaction?: Transaction): Promise<MAccountDefault> {
     return AccountModel.findByPk(id, { transaction })
   }
 
-  static loadByNameWithHost (nameWithHost: string): Promise<MAccountDefault> {
-    const [ accountName, host ] = nameWithHost.split('@')
+  static loadByHandle (handle: string): Promise<MAccountDefault> {
+    const [ accountName, host ] = handle.split('@')
 
     if (!host || host === WEBSERVER.HOST) return AccountModel.loadLocalByName(accountName)
 
@@ -409,8 +444,8 @@ export class AccountModel extends SequelizeModel<AccountModel> {
   }
 
   static listLocalsForSitemap (sort: string): Promise<MAccountHost[]> {
-    const query = {
-      attributes: [ ],
+    return AccountModel.unscoped().findAll({
+      attributes: [],
       offset: 0,
       order: getSort(sort),
       include: [
@@ -420,13 +455,19 @@ export class AccountModel extends SequelizeModel<AccountModel> {
           where: {
             serverId: null
           }
+        },
+        {
+          attributes: [ 'id' ],
+          model: VideoChannelModel.unscoped(),
+          required: true,
+          where: {
+            [Op.and]: [
+              literal(`EXISTS (SELECT 1 FROM "video" WHERE "privacy" = ${VideoPrivacy.PUBLIC} AND "channelId" = "VideoChannels"."id")`)
+            ]
+          }
         }
       ]
-    }
-
-    return AccountModel
-      .unscoped()
-      .findAll(query)
+    })
   }
 
   toFormattedJSON (this: MAccountFormattable): Account {
@@ -455,16 +496,36 @@ export class AccountModel extends SequelizeModel<AccountModel> {
     }
   }
 
-  async toActivityPubObject (this: MAccountAP) {
+  async toActivityPubObject (this: MAccountAP): Promise<ActivityPubActor> {
     const obj = await this.Actor.toActivityPubObject(this.name)
 
     return Object.assign(obj, {
+      // // TODO: Uncomment in v8 for backward compatibility
+      // url: [
+      //   {
+      //     type: 'Link',
+      //     mediaType: 'text/html',
+      //     href: this.getClientUrl(true)
+      //   },
+      //   {
+      //     type: 'Link',
+      //     mediaType: 'text/html',
+      //     href: this.getClientUrl(false)
+      //   },
+      //   {
+      //     type: 'Link',
+      //     mediaType: 'text/html',
+      //     href: this.Actor.url
+      //   }
+      // ] as ActivityUrlObject[],
+
+      url: this.Actor.url,
       summary: this.description
     })
   }
 
-  isOwned () {
-    return this.Actor.isOwned()
+  isLocal () {
+    return this.Actor.isLocal()
   }
 
   isOutdated () {
@@ -476,8 +537,12 @@ export class AccountModel extends SequelizeModel<AccountModel> {
   }
 
   // Avoid error when running this method on MAccount... | MChannel...
-  getClientUrl (this: MAccountHost | MChannelHost) {
-    return WEBSERVER.URL + '/a/' + this.Actor.getIdentifier() + '/video-channels'
+  getClientUrl (this: MAccountIdHost | MChannelIdHost, channelsSuffix = true) {
+    const suffix = channelsSuffix
+      ? '/video-channels'
+      : ''
+
+    return WEBSERVER.URL + '/a/' + this.Actor.getIdentifier() + suffix
   }
 
   isBlocked () {

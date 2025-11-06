@@ -1,8 +1,10 @@
 import { isTestOrDevInstance } from '@peertube/peertube-node-utils'
 import { ActorCustomPageModel } from '@server/models/account/actor-custom-page.js'
+import { UploadImageModel } from '@server/models/application/upload-image.js'
+import { AccountAutomaticTagPolicyModel } from '@server/models/automatic-tag/account-automatic-tag-policy.js'
 import { AutomaticTagModel } from '@server/models/automatic-tag/automatic-tag.js'
-import { VideoAutomaticTagModel } from '@server/models/automatic-tag/video-automatic-tag.js'
 import { CommentAutomaticTagModel } from '@server/models/automatic-tag/comment-automatic-tag.js'
+import { VideoAutomaticTagModel } from '@server/models/automatic-tag/video-automatic-tag.js'
 import { RunnerJobModel } from '@server/models/runner/runner-job.js'
 import { RunnerRegistrationTokenModel } from '@server/models/runner/runner-registration-token.js'
 import { RunnerModel } from '@server/models/runner/runner.js'
@@ -14,11 +16,15 @@ import { UserNotificationModel } from '@server/models/user/user-notification.js'
 import { UserRegistrationModel } from '@server/models/user/user-registration.js'
 import { UserVideoHistoryModel } from '@server/models/user/user-video-history.js'
 import { UserModel } from '@server/models/user/user.js'
+import { PlayerSettingModel } from '@server/models/video/player-setting.js'
 import { StoryboardModel } from '@server/models/video/storyboard.js'
+import { VideoChannelActivityModel } from '@server/models/video/video-channel-activity.js'
+import { VideoChannelCollaboratorModel } from '@server/models/video/video-channel-collaborator.js'
 import { VideoChannelSyncModel } from '@server/models/video/video-channel-sync.js'
 import { VideoChapterModel } from '@server/models/video/video-chapter.js'
 import { VideoJobInfoModel } from '@server/models/video/video-job-info.js'
 import { VideoLiveReplaySettingModel } from '@server/models/video/video-live-replay-setting.js'
+import { VideoLiveScheduleModel } from '@server/models/video/video-live-schedule.js'
 import { VideoLiveSessionModel } from '@server/models/video/video-live-session.js'
 import { VideoPasswordModel } from '@server/models/video/video-password.js'
 import { VideoSourceModel } from '@server/models/video/video-source.js'
@@ -66,7 +72,6 @@ import { VideoTagModel } from '../models/video/video-tag.js'
 import { VideoModel } from '../models/video/video.js'
 import { VideoViewModel } from '../models/view/video-view.js'
 import { CONFIG } from './config.js'
-import { AccountAutomaticTagPolicyModel } from '@server/models/automatic-tag/account-automatic-tag-policy.js'
 
 pg.defaults.parseInt8 = true // Avoid BIGINT to be converted to string
 
@@ -87,7 +92,7 @@ if (CONFIG.DATABASE.SSL) {
   }
 }
 
-const sequelizeTypescript = new SequelizeTypescript({
+export const sequelizeTypescript = new SequelizeTypescript({
   database: dbname,
   dialect: 'postgres',
   dialectOptions,
@@ -112,17 +117,16 @@ const sequelizeTypescript = new SequelizeTypescript({
   }
 })
 
-function checkDatabaseConnectionOrDie () {
+export function checkDatabaseConnectionOrDie () {
   sequelizeTypescript.authenticate()
     .then(() => logger.debug('Connection to PostgreSQL has been established successfully.'))
     .catch(err => {
-
       logger.error('Unable to connect to PostgreSQL database.', { err })
       process.exit(-1)
     })
 }
 
-async function initDatabaseModels (silent: boolean) {
+export async function initDatabaseModels (silent: boolean) {
   sequelizeTypescript.addModels([
     ApplicationModel,
     ActorModel,
@@ -145,6 +149,7 @@ async function initDatabaseModels (silent: boolean) {
     VideoShareModel,
     VideoFileModel,
     VideoSourceModel,
+    VideoChannelActivityModel,
     VideoChapterModel,
     VideoCaptionModel,
     VideoBlacklistModel,
@@ -186,24 +191,23 @@ async function initDatabaseModels (silent: boolean) {
     CommentAutomaticTagModel,
     AutomaticTagModel,
     WatchedWordsListModel,
-    AccountAutomaticTagPolicyModel
+    AccountAutomaticTagPolicyModel,
+    UploadImageModel,
+    VideoLiveScheduleModel,
+    PlayerSettingModel,
+    VideoChannelCollaboratorModel
   ])
 
   // Check extensions exist in the database
   await checkPostgresExtensions()
 
-  // Create custom PostgreSQL functions
   await createFunctions()
 
   if (!silent) logger.info('Database %s is ready.', dbname)
 }
 
 // ---------------------------------------------------------------------------
-
-export {
-  checkDatabaseConnectionOrDie, initDatabaseModels, sequelizeTypescript
-}
-
+// Private
 // ---------------------------------------------------------------------------
 
 async function checkPostgresExtensions () {
@@ -228,7 +232,6 @@ async function checkPostgresExtension (extension: string) {
     // Try to create the extension ourselves
     try {
       await sequelizeTypescript.query(`CREATE EXTENSION ${extension};`, { raw: true })
-
     } catch {
       const errorMessage = `You need to enable ${extension} extension in PostgreSQL. ` +
         `You can do so by running 'CREATE EXTENSION ${extension};' as a PostgreSQL super user in ${CONFIG.DATABASE.DBNAME} database.`

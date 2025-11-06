@@ -31,16 +31,16 @@ module.exports = {
           args: [ '--headless', '--disable-gpu', windowSizeArg ],
           prefs
         }
-      },
-      {
-        'browserName': 'firefox',
-        'moz:firefoxOptions': {
-          binary: '/usr/bin/firefox-developer-edition',
-          args: [ '--headless', windowSizeArg ],
-
-          prefs
-        }
       }
+      // {
+      //   'browserName': 'firefox',
+      //   'moz:firefoxOptions': {
+      //     binary: '/usr/bin/firefox-developer-edition',
+      //     args: [ '--headless', windowSizeArg ],
+
+      //     prefs
+      //   }
+      // }
     ],
 
     services: [ 'shared-store' ],

@@ -1,8 +1,5 @@
 import { buildAspectRatio } from '@peertube/peertube-core-utils'
-import {
-  ffprobePromise,
-  getChaptersFromContainer, getVideoStreamDuration
-} from '@peertube/peertube-ffmpeg'
+import { ffprobePromise, getChaptersFromContainer, getVideoStreamDuration } from '@peertube/peertube-ffmpeg'
 import {
   ThumbnailType,
   ThumbnailType_Type,
@@ -12,7 +9,8 @@ import {
   VideoImportTorrentPayload,
   VideoImportTorrentPayloadType,
   VideoImportYoutubeDLPayload,
-  VideoImportYoutubeDLPayloadType, VideoState
+  VideoImportYoutubeDLPayloadType,
+  VideoState
 } from '@peertube/peertube-models'
 import { retryTransactionWrapper } from '@server/helpers/database-utils.js'
 import { YoutubeDLWrapper } from '@server/helpers/youtube-dl/index.js'
@@ -27,7 +25,7 @@ import { isUserQuotaValid } from '@server/lib/user.js'
 import { createTranscriptionTaskIfNeeded } from '@server/lib/video-captions.js'
 import { replaceChaptersIfNotExist } from '@server/lib/video-chapters.js'
 import { buildNewFile } from '@server/lib/video-file.js'
-import { buildMoveJob, buildStoryboardJobIfNeeded } from '@server/lib/video-jobs.js'
+import { addLocalOrRemoteStoryboardJobIfNeeded, buildMoveVideoJob } from '@server/lib/video-jobs.js'
 import { VideoPathManager } from '@server/lib/video-path-manager.js'
 import { buildNextVideoState } from '@server/lib/video-state.js'
 import { VideoCaptionModel } from '@server/models/video/video-caption.js'
@@ -305,7 +303,7 @@ async function afterImportSuccess (options: {
   }
 
   // Generate the storyboard in the job queue, and don't forget to federate an update after
-  await JobQueue.Instance.createJob(buildStoryboardJobIfNeeded({ video, federate: true }))
+  await addLocalOrRemoteStoryboardJobIfNeeded({ video, federate: true })
 
   if (await VideoCaptionModel.hasVideoCaption(video.id) !== true && generateTranscription === true) {
     await createTranscriptionTaskIfNeeded(video)
@@ -313,7 +311,7 @@ async function afterImportSuccess (options: {
 
   if (video.state === VideoState.TO_MOVE_TO_EXTERNAL_STORAGE) {
     await JobQueue.Instance.createJob(
-      await buildMoveJob({ video, previousVideoState: VideoState.TO_IMPORT, type: 'move-to-object-storage' })
+      await buildMoveVideoJob({ video, previousVideoState: VideoState.TO_IMPORT, type: 'move-to-object-storage' })
     )
     return
   }

@@ -24,6 +24,7 @@ export interface VideoObject {
   views: number
 
   sensitive: boolean
+  summary: string
 
   isLiveBroadcast: boolean
   liveSaveReplay: boolean
@@ -43,6 +44,10 @@ export interface VideoObject {
   updated: string
   uploadDate: string
 
+  schedules?: {
+    startDate: Date
+  }[]
+
   mediaType: 'text/markdown'
   content: string
 
@@ -59,6 +64,7 @@ export interface VideoObject {
   shares: string
   comments: string
   hasParts: string | VideoChapterObject[]
+  playerSettings: string
 
   attributedTo: ActivityPubAttributedTo[]
 
@@ -80,7 +86,7 @@ export interface VideoObject {
 
 export interface ActivityPubStoryboard {
   type: 'Image'
-  rel: [ 'storyboard' ]
+  rel: ['storyboard']
   url: {
     href: string
     mediaType: string

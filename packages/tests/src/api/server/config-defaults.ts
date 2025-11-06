@@ -26,7 +26,6 @@ describe('Test config defaults', function () {
   })
 
   describe('Default publish values', function () {
-
     before(async function () {
       const overrideConfig = {
         defaults: {
@@ -123,9 +122,7 @@ describe('Test config defaults', function () {
   })
 
   describe('Default P2P values', function () {
-
     describe('Webapp default value', function () {
-
       before(async function () {
         const overrideConfig = {
           defaults: {
@@ -167,7 +164,6 @@ describe('Test config defaults', function () {
     })
 
     describe('Embed default value', function () {
-
       before(async function () {
         const overrideConfig = {
           defaults: {
@@ -212,6 +208,49 @@ describe('Test config defaults', function () {
     })
   })
 
+  describe('Default player value', function () {
+    before(async function () {
+      const overrideConfig = {
+        defaults: {
+          player: {
+            theme: 'lucide',
+            auto_play: false
+          }
+        },
+        signup: {
+          limit: 15
+        }
+      }
+
+      await server.kill()
+      await server.run(overrideConfig)
+    })
+
+    it('Should have appropriate player config', async function () {
+      const config = await server.config.getConfig()
+
+      expect(config.defaults.player.theme).to.equal('lucide')
+      expect(config.defaults.player.autoPlay).to.be.false
+    })
+
+    it('Should create a user with this default setting', async function () {
+      await server.users.create({ username: 'user_autoplay_1' })
+      const userToken = await server.login.getAccessToken('user_autoplay_1')
+
+      const { autoPlayVideo } = await server.users.getMyInfo({ token: userToken })
+      expect(autoPlayVideo).to.be.false
+    })
+
+    it('Should register a user with this default setting', async function () {
+      await server.registrations.register({ username: 'user_autoplay_2' })
+
+      const userToken = await server.login.getAccessToken('user_autoplay_2')
+
+      const { autoPlayVideo } = await server.users.getMyInfo({ token: userToken })
+      expect(autoPlayVideo).to.be.false
+    })
+  })
+
   describe('Default user attributes', function () {
     it('Should create a user and register a user with the default config', async function () {
       await server.config.updateExistingConfig({
@@ -222,7 +261,7 @@ describe('Test config defaults', function () {
                 enabled: true
               }
             },
-            videoQuota : -1,
+            videoQuota: -1,
             videoQuotaDaily: -1
           },
           signup: {
@@ -262,7 +301,7 @@ describe('Test config defaults', function () {
                 enabled: false
               }
             },
-            videoQuota : 5242881,
+            videoQuota: 5242881,
             videoQuotaDaily: 318742
           },
           signup: {
@@ -287,7 +326,6 @@ describe('Test config defaults', function () {
         expect(user.videoQuotaDaily).to.equal(318742)
       }
     })
-
   })
 
   after(async function () {

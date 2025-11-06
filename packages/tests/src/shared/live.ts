@@ -2,28 +2,34 @@
 
 import { getVideoStreamDimensionsInfo, getVideoStreamFPS } from '@peertube/peertube-ffmpeg'
 import { LiveVideo, VideoResolution, VideoStreamingPlaylistType } from '@peertube/peertube-models'
-import { sha1 } from '@peertube/peertube-node-utils'
 import { ObjectStorageCommand, PeerTubeServer } from '@peertube/peertube-server-commands'
 import { expect } from 'chai'
 import { pathExists } from 'fs-extra/esm'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 import { SQLCommand } from './sql-command.js'
-import { checkLiveSegmentHash, checkResolutionsInMasterPlaylist } from './streaming-playlists.js'
+import { checkLiveSegmentHash, checkPlaylistInfohash, checkResolutionsInMasterPlaylist } from './streaming-playlists.js'
 
 async function checkLiveCleanup (options: {
   server: PeerTubeServer
   videoUUID: string
   permanent: boolean
   savedResolutions?: number[]
+  deleted?: boolean // default false
 }) {
-  const { server, videoUUID, permanent, savedResolutions = [] } = options
+  const { server, videoUUID, permanent, savedResolutions = [], deleted = false } = options
 
   const basePath = server.servers.buildDirectory('streaming-playlists')
   const hlsPath = join(basePath, 'hls', videoUUID)
+  const hlsPathExists = await pathExists(hlsPath)
+
+  if (deleted) {
+    expect(hlsPathExists).to.be.false
+    return
+  }
 
   if (permanent) {
-    if (!await pathExists(hlsPath)) return
+    if (!hlsPathExists) return
 
     const files = await readdir(hlsPath)
     expect(files.filter(f => f !== 'replay')).to.have.lengthOf(0)
@@ -32,15 +38,13 @@ async function checkLiveCleanup (options: {
     if (await pathExists(replayDir)) {
       expect(await readdir(replayDir)).to.have.lengthOf(0)
     }
+  } else {
+    if (savedResolutions.length === 0) {
+      return checkUnsavedLiveCleanup(server, videoUUID, hlsPath)
+    }
 
-    return
+    return checkSavedLiveCleanup(hlsPath, savedResolutions)
   }
-
-  if (savedResolutions.length === 0) {
-    return checkUnsavedLiveCleanup(server, videoUUID, hlsPath)
-  }
-
-  return checkSavedLiveCleanup(hlsPath, savedResolutions)
 }
 
 // ---------------------------------------------------------------------------
@@ -164,13 +168,10 @@ async function testLiveVideoResolutions (options: {
         hlsPlaylist,
         withRetry: !!objectStorage // With object storage, the request may fail because of inconsistent data in S3
       })
+    }
 
-      if (originServer.internalServerNumber === server.internalServerNumber) {
-        const infohash = sha1(`2${hlsPlaylist.playlistUrl}+V${i}`)
-        const dbInfohashes = await sqlCommand.getPlaylistInfohash(hlsPlaylist.id)
-
-        expect(dbInfohashes).to.include(infohash)
-      }
+    if (originServer.internalServerNumber === server.internalServerNumber) {
+      await checkPlaylistInfohash({ video, sqlCommand, files: resolutions.map(r => ({ resolution: { id: r } })) })
     }
   }
 }

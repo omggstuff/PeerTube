@@ -14,12 +14,7 @@ import {
   VideoState
 } from '@peertube/peertube-models'
 import { areMockObjectStorageTestsDisabled } from '@peertube/peertube-node-utils'
-import {
-  ObjectStorageCommand,
-  PeerTubeServer,
-  cleanupTests,
-  waitJobs
-} from '@peertube/peertube-server-commands'
+import { ObjectStorageCommand, PeerTubeServer, cleanupTests, waitJobs } from '@peertube/peertube-server-commands'
 import { testAvatarSize, testImage } from '@tests/shared/checks.js'
 import { prepareImportExportTests } from '@tests/shared/import-export.js'
 import { MockSmtpServer } from '@tests/shared/mock-servers/index.js'
@@ -57,9 +52,8 @@ function runTest (withObjectStorage: boolean) {
 
     objectStorage = withObjectStorage
       ? new ObjectStorageCommand()
-      : undefined;
-
-    ({
+      : undefined
+    ;({
       noahId,
       externalVideo,
       noahVideo,
@@ -122,7 +116,6 @@ function runTest (withObjectStorage: boolean) {
   })
 
   describe('Import process', function () {
-
     it('Should import an archive with video files', async function () {
       this.timeout(240000)
 
@@ -142,7 +135,6 @@ function runTest (withObjectStorage: boolean) {
   })
 
   describe('Import data', function () {
-
     it('Should have correctly imported blocklist', async function () {
       {
         const { data } = await remoteServer.blocklist.listMyAccountBlocklist({ start: 0, count: 5, token: remoteNoahToken })
@@ -178,6 +170,7 @@ function runTest (withObjectStorage: boolean) {
         const me = await remoteServer.users.getMyInfo({ token: remoteNoahToken })
 
         expect(me.p2pEnabled).to.be.false
+        expect(me.language).to.equal('fr')
 
         const settings = me.notificationSettings
 
@@ -200,17 +193,31 @@ function runTest (withObjectStorage: boolean) {
       expect(importedMain.avatars).to.have.lengthOf(0)
       expect(importedMain.banners).to.have.lengthOf(0)
 
+      const playerSettingMain = await remoteServer.playerSettings.getForChannel({
+        channelHandle: 'noah_remote_channel',
+        token: remoteServer.accessToken,
+        raw: true
+      })
+      expect(playerSettingMain.theme).to.equal('instance-default')
+
       const importedSecond = await remoteServer.channels.get({ token: remoteNoahToken, channelName: 'noah_second_channel' })
       expect(importedSecond.displayName).to.equal('noah display name')
       expect(importedSecond.description).to.equal('noah description')
       expect(importedSecond.support).to.equal('noah support')
 
+      const playerSettingSecond = await remoteServer.playerSettings.getForChannel({
+        channelHandle: 'noah_second_channel',
+        token: remoteServer.accessToken,
+        raw: true
+      })
+      expect(playerSettingSecond.theme).to.equal('galaxy')
+
       for (const banner of importedSecond.banners) {
-        await testImage(remoteServer.url, `banner-user-import-resized-${banner.width}`, banner.path)
+        await testImage({ url: banner.fileUrl, name: `banner-user-import-resized-${banner.width}.jpg` })
       }
 
       for (const avatar of importedSecond.avatars) {
-        await testImage(remoteServer.url, `avatar-resized-${avatar.width}x${avatar.width}`, avatar.path, '.png')
+        await testImage({ url: remoteServer.url + avatar.path, name: `avatar-resized-${avatar.width}x${avatar.width}.png` })
       }
 
       {
@@ -363,6 +370,9 @@ function runTest (withObjectStorage: boolean) {
     })
 
     it('Should have correctly imported user videos', async function () {
+      // We observe weird behaviour in the CI, so re-wait jobs here just to be sure
+      await waitJobs([ remoteServer, server ])
+
       const { data } = await remoteServer.videos.listMyVideos({ token: remoteNoahToken })
       expect(data).to.have.lengthOf(5)
 
@@ -380,6 +390,13 @@ function runTest (withObjectStorage: boolean) {
         expect(publicVideo).to.exist
         expect(publicVideo.privacy.id).to.equal(VideoPrivacy.PUBLIC)
 
+        const playerSetting = await remoteServer.playerSettings.getForVideo({
+          videoId: publicVideo.uuid,
+          token: remoteServer.accessToken,
+          raw: true
+        })
+        expect(playerSetting.theme).to.equal('lucide')
+
         // Federated
         await server.videos.get({ id: publicVideo.uuid })
       }
@@ -388,6 +405,13 @@ function runTest (withObjectStorage: boolean) {
         const passwordVideo = data.find(v => v.name === 'noah password video')
         expect(passwordVideo).to.exist
         expect(passwordVideo.privacy.id).to.equal(VideoPrivacy.PASSWORD_PROTECTED)
+
+        const playerSetting = await remoteServer.playerSettings.getForVideo({
+          videoId: passwordVideo.uuid,
+          token: remoteServer.accessToken,
+          raw: true
+        })
+        expect(playerSetting.theme).to.equal('channel-default')
 
         const { data: passwords } = await remoteServer.videoPasswords.list({ videoId: passwordVideo.uuid })
         expect(passwords.map(p => p.password).sort()).to.deep.equal([ 'password1', 'password2' ])
@@ -453,12 +477,24 @@ function runTest (withObjectStorage: boolean) {
           })
         }
 
+        const { data: captions } = await remoteServer.captions.list({ videoId: otherVideo.uuid })
+
+        // TODO: merge these functions in v8, caption playlist are not federated before v8
         await completeCheckHlsPlaylist({
           hlsOnly: false,
-          servers: [ remoteServer, server ],
+          servers: [ remoteServer ],
           videoUUID: otherVideo.uuid,
           objectStorageBaseUrl: objectStorage?.getMockPlaylistBaseUrl(),
-          resolutions: [ 720, 240 ]
+          resolutions: [ 720, 240 ],
+          captions
+        })
+        await completeCheckHlsPlaylist({
+          hlsOnly: false,
+          servers: [ server ],
+          videoUUID: otherVideo.uuid,
+          objectStorageBaseUrl: objectStorage?.getMockPlaylistBaseUrl(),
+          resolutions: [ 720, 240 ],
+          captions: [] // Caption playlist are not federated before v8
         })
 
         const source = await remoteServer.videos.getSource({ id: otherVideo.uuid })
@@ -474,7 +510,7 @@ function runTest (withObjectStorage: boolean) {
         const liveVideo = data.find(v => v.name === 'noah live video')
         expect(liveVideo).to.exist
 
-        await remoteServer.videos.get({ id: liveVideo.uuid, expectedStatus: HttpStatusCode.FORBIDDEN_403 })
+        await remoteServer.videos.get({ id: liveVideo.uuid, expectedStatus: HttpStatusCode.UNAUTHORIZED_401 })
         const video = await remoteServer.videos.getWithPassword({ id: liveVideo.uuid, password: 'password1' })
         const live = await remoteServer.live.get({ videoId: liveVideo.uuid, token: remoteNoahToken })
 
@@ -484,6 +520,7 @@ function runTest (withObjectStorage: boolean) {
         expect(live.permanentLive).to.be.true
         expect(live.streamKey).to.exist
         expect(live.replaySettings.privacy).to.equal(VideoPrivacy.PUBLIC)
+        expect(live.schedules[0].startAt).to.exist
 
         expect(video.channel.name).to.equal('noah_second_channel')
         expect(video.privacy.id).to.equal(VideoPrivacy.PASSWORD_PROTECTED)
@@ -498,7 +535,6 @@ function runTest (withObjectStorage: boolean) {
   })
 
   describe('Re-import', function () {
-
     it('Should re-import the same file', async function () {
       this.timeout(240000)
 
@@ -584,15 +620,14 @@ function runTest (withObjectStorage: boolean) {
   })
 
   describe('After import', function () {
-
     it('Should have received an email on finished import', async function () {
       const email = emails.reverse().find(e => {
         return e['to'][0]['address'] === 'noah_remote@example.com' &&
-          e['subject'].includes('archive import has finished')
+          e['subject'].includes('importation de votre archive est terminée')
       })
 
       expect(email).to.exist
-      expect(email['text']).to.contain('as considered duplicate: 5') // 5 videos are considered as duplicates
+      expect(email['text']).to.contain('considéré comme doublon : 5') // 5 videos are considered as duplicates
     })
 
     it('Should auto blacklist imported videos if enabled by the administrator', async function () {
@@ -616,7 +651,6 @@ function runTest (withObjectStorage: boolean) {
   })
 
   describe('Custom video options included in the export', function () {
-
     async function generateAndExportImport (username: string) {
       const archivePath = join(server.getDirectoryPath('tmp'), `archive${username}.zip`)
       const fixture = 'video_short1.webm'
@@ -711,14 +745,13 @@ function runTest (withObjectStorage: boolean) {
   })
 
   after(async function () {
-    MockSmtpServer.Instance.kill()
+    await MockSmtpServer.Instance.kill()
 
     await cleanupTests([ server, remoteServer, blockedServer ])
   })
 }
 
 describe('Test user import', function () {
-
   describe('From filesystem', function () {
     runTest(false)
   })

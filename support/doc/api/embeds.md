@@ -11,10 +11,10 @@ For instance, the playground URL for the above embed URL is `https://my-instance
 ## Quick Start
 
 Given an existing PeerTube embed `<iframe>` **with API enabled** (`https://my-instance.example.com/videos/embed/52a10666-3a18-4e73-93da-e8d3c12c305a?api=1`),
-one can use the PeerTube Embed API to control it by first including the library. You can include it via Yarn with:
+one can use the PeerTube Embed API to control it by first including the library. You can include it via NPM with:
 
 ```
-yarn add @peertube/embed-api
+npm install @peertube/embed-api
 ```
 
 Now just use the `PeerTubePlayer` class exported by the module:
@@ -202,20 +202,32 @@ Default: `0`
 
 ### `ready: Promise<void>`
 
-This promise is resolved when the video is loaded an the player is ready.
+This promise is resolved when the video is loaded and the player is ready.
 
 
 ## Embed methods
 
-### `play() : Promise<void>`
+### `isPlaying(): Promise<boolean>`
+
+**PeerTube >= 7.0**
+
+Check if the player is playing the media.
+
+### `play(): Promise<void>`
 
 Starts playback, or resumes playback if it is paused.
 
-### `pause() : Promise<void>`
+### `pause(): Promise<void>`
 
 Pauses playback.
 
-### `seek(positionInSeconds : number)`
+### `getCurrentTime(): Promise<number>`
+
+**PeerTube >= 7.0**
+
+Get player current time in seconds.
+
+### `seek(positionInSeconds : number): Promise<void>`
 
 Seek to the given position, as specified in seconds into the video.
 

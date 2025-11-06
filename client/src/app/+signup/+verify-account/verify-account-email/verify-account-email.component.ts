@@ -1,18 +1,24 @@
-import { Component, OnInit } from '@angular/core'
+import { NgIf } from '@angular/common'
+import { Component, OnInit, inject } from '@angular/core'
 import { ActivatedRoute, RouterLink } from '@angular/router'
 import { SignupService } from '@app/+signup/shared/signup.service'
-import { AuthService, Notifier, ServerService } from '@app/core'
+import { AuthService, Notifier, ServerService, UserService } from '@app/core'
+import { AlertComponent } from '@app/shared/shared-main/common/alert.component'
 import { SignupSuccessAfterEmailComponent } from '../../shared/signup-success-after-email.component'
-import { NgIf } from '@angular/common'
 
 @Component({
   selector: 'my-verify-account-email',
   templateUrl: './verify-account-email.component.html',
-  standalone: true,
-  imports: [ NgIf, SignupSuccessAfterEmailComponent, RouterLink ]
+  imports: [ NgIf, SignupSuccessAfterEmailComponent, RouterLink, AlertComponent ]
 })
-
 export class VerifyAccountEmailComponent implements OnInit {
+  private signupService = inject(SignupService)
+  private userService = inject(UserService)
+  private server = inject(ServerService)
+  private authService = inject(AuthService)
+  private notifier = inject(Notifier)
+  private route = inject(ActivatedRoute)
+
   success = false
   failed = false
   isPendingEmail = false
@@ -23,15 +29,6 @@ export class VerifyAccountEmailComponent implements OnInit {
   private userId: number
   private registrationId: number
   private verificationString: string
-
-  constructor (
-    private signupService: SignupService,
-    private server: ServerService,
-    private authService: AuthService,
-    private notifier: Notifier,
-    private route: ActivatedRoute
-  ) {
-  }
 
   get instanceName () {
     return this.server.getHTMLConfig().instance.name
@@ -48,9 +45,7 @@ export class VerifyAccountEmailComponent implements OnInit {
 
     this.userId = queryParams['userId']
     this.registrationId = queryParams['registrationId']
-
     this.verificationString = queryParams['verificationString']
-
     this.isPendingEmail = queryParams['isPendingEmail'] === 'true'
 
     if (!this.verificationString) {
@@ -66,15 +61,12 @@ export class VerifyAccountEmailComponent implements OnInit {
     this.verifyEmail()
   }
 
-  isRegistrationRequest () {
-    return !!this.registrationId
+  isRegistration () {
+    return !this.isPendingEmail
   }
 
-  displaySignupSuccess () {
-    if (!this.success) return false
-    if (!this.isRegistrationRequest() && this.isPendingEmail) return false
-
-    return true
+  isRegistrationRequest () {
+    return !!this.registrationId
   }
 
   verifyEmail () {
@@ -92,7 +84,7 @@ export class VerifyAccountEmailComponent implements OnInit {
       isPendingEmail: this.isPendingEmail
     }
 
-    this.signupService.verifyUserEmail(options)
+    this.userService.verifyUserEmail(options)
       .subscribe({
         next: () => {
           if (this.authService.isLoggedIn()) {

@@ -1,16 +1,16 @@
+import { ActivityPubActor, ActorImageType } from '@peertube/peertube-models'
 import { resetSequelizeInstance, runInReadCommittedTransaction } from '@server/helpers/database-utils.js'
 import { logger } from '@server/helpers/logger.js'
 import { AccountModel } from '@server/models/account/account.js'
 import { VideoChannelModel } from '@server/models/video/video-channel.js'
 import { MAccount, MActor, MActorFull, MChannel } from '@server/types/models/index.js'
-import { ActivityPubActor, ActorImageType } from '@peertube/peertube-models'
+import { upsertAPPlayerSettings } from '../player-settings.js'
 import { getOrCreateAPOwner } from './get.js'
 import { updateActorImages } from './image.js'
 import { fetchActorFollowsCount } from './shared/index.js'
 import { getImagesInfoFromObject } from './shared/object-to-model-attributes.js'
 
 export class APActorUpdater {
-
   private readonly accountOrChannel: MAccount | MChannel
 
   constructor (
@@ -32,11 +32,20 @@ export class APActorUpdater {
       this.accountOrChannel.description = this.actorObject.summary
 
       if (this.accountOrChannel instanceof VideoChannelModel) {
-        const owner = await getOrCreateAPOwner(this.actorObject, this.actorObject.url)
+        const owner = await getOrCreateAPOwner(this.actorObject, this.actorObject.id)
         this.accountOrChannel.accountId = owner.Account.id
         this.accountOrChannel.Account = owner.Account as AccountModel
 
         this.accountOrChannel.support = this.actorObject.support
+
+        if (typeof this.actorObject.playerSettings === 'string') {
+          await upsertAPPlayerSettings({
+            settingsObject: this.actorObject.playerSettings,
+            video: undefined,
+            channel: this.accountOrChannel,
+            contextUrl: this.actor.url
+          })
+        }
       }
 
       await runInReadCommittedTransaction(async t => {
@@ -49,7 +58,8 @@ export class APActorUpdater {
         await this.accountOrChannel.save({ transaction: t })
       })
 
-      logger.info('Remote account %s updated', this.actorObject.url)
+      // Update the following line to template string
+      logger.info(`Remote account ${this.actorObject.id} updated`)
     } catch (err) {
       if (this.actor !== undefined) {
         await resetSequelizeInstance(this.actor)

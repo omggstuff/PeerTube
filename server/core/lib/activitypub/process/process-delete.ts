@@ -27,9 +27,10 @@ async function processDeleteActivity (options: APProcessorOptions<ActivityDelete
   if (activity.actor === objectUrl) {
     // We need more attributes (all the account and channel)
     const byActorFull = await ActorModel.loadByUrlAndPopulateAccountAndChannel(byActor.url)
+    if (!byActorFull) return
 
     if (isAccountActor(byActorFull.type)) {
-      if (!byActorFull.Account) throw new Error('Actor ' + byActorFull.url + ' is a person but we cannot find it in database.')
+      if (!byActorFull.Account) throw new Error(`Actor ${byActorFull.url} is a person but we cannot find the account in database.`)
 
       const accountToDelete = byActorFull.Account as MAccountActor
       accountToDelete.Actor = byActorFull
@@ -54,7 +55,7 @@ async function processDeleteActivity (options: APProcessorOptions<ActivityDelete
   {
     const videoInstance = await VideoModel.loadByUrlAndPopulateAccountAndFiles(objectUrl)
     if (videoInstance) {
-      if (videoInstance.isOwned()) throw new Error(`Remote instance cannot delete owned video ${videoInstance.url}.`)
+      if (videoInstance.isLocal()) throw new Error(`Remote instance cannot delete owned video ${videoInstance.url}.`)
 
       return retryTransactionWrapper(processDeleteVideo, byActor, videoInstance)
     }
@@ -63,7 +64,7 @@ async function processDeleteActivity (options: APProcessorOptions<ActivityDelete
   {
     const videoPlaylist = await VideoPlaylistModel.loadByUrlAndPopulateAccount(objectUrl)
     if (videoPlaylist) {
-      if (videoPlaylist.isOwned()) throw new Error(`Remote instance cannot delete owned playlist ${videoPlaylist.url}.`)
+      if (videoPlaylist.isLocal()) throw new Error(`Remote instance cannot delete owned playlist ${videoPlaylist.url}.`)
 
       return retryTransactionWrapper(processDeleteVideoPlaylist, byActor, videoPlaylist)
     }
@@ -143,7 +144,7 @@ function processDeleteVideoComment (byActor: MActorSignature, videoComment: MCom
 
     await videoComment.save({ transaction: t })
 
-    if (videoComment.Video.isOwned()) {
+    if (videoComment.Video.isLocal()) {
       // Don't resend the activity to the sender
       const exceptions = [ byActor ]
       await forwardVideoRelatedActivity(activity, t, exceptions, videoComment.Video)

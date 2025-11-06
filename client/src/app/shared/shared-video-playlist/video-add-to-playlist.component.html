@@ -40,18 +40,19 @@
           <my-peertube-checkbox
             [inputName]="getOptionalInputName(playlist, element)"
             [ngModel]="element.enabled"
-            (click)="toggleOptionalPlaylist($event, playlist, element, startAt.timestamp, stopAt.timestamp)"
+            (click)="toggleOptionalPlaylist($event, playlist, element, startAt.timestamp(), stopAt.timestamp())"
           ></my-peertube-checkbox>
 
           <my-timestamp-input
-            [maxTimestamp]="video.duration"
+            class="me-2"
+            [maxTimestamp]="video().duration"
             [(ngModel)]="element.startTimestamp"
             (inputBlur)="onElementTimestampUpdate(playlist, element)"
             #startAt
           ></my-timestamp-input>
 
           <my-timestamp-input
-            [maxTimestamp]="video.duration"
+            [maxTimestamp]="video().duration"
             [(ngModel)]="element.stopTimestamp"
             (inputBlur)="onElementTimestampUpdate(playlist, element)"
             #stopAt
@@ -67,11 +68,11 @@
     <span i18n>Create a private playlist</span>
   </button>
 
-  <form class="new-playlist-block dropdown-item" *ngIf="isNewPlaylistBlockOpened" (ngSubmit)="createPlaylist()" [formGroup]="form">
+  <form class="new-playlist-block" *ngIf="isNewPlaylistBlockOpened" (ngSubmit)="createPlaylist()" [formGroup]="form">
     <div class="form-group">
       <label i18n for="displayName">Display name</label>
       <input
-        type="text" id="displayName"
+        type="text" id="displayName" class="form-control"
         formControlName="displayName" [ngClass]="{ 'input-error': formErrors['displayName'] }"
       >
       <div *ngIf="formErrors['displayName']" class="form-error" role="alert">
@@ -79,6 +80,6 @@
       </div>
     </div>
 
-    <input type="submit" i18n-value value="Create" [disabled]="!form.valid">
+    <input type="submit" class="peertube-button primary-button" i18n-value value="Create" [disabled]="!form.valid">
   </form>
 </div>

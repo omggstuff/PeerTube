@@ -1,8 +1,9 @@
-import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common'
-import { Component, OnInit, ViewChild } from '@angular/core'
-import { ActivatedRoute, Router, RouterLink } from '@angular/router'
-import { AuthService, ConfirmService, Notifier, RestPagination, RestTable, ServerService } from '@app/core'
+import { CommonModule } from '@angular/common'
+import { Component, OnInit, inject, viewChild } from '@angular/core'
+import { ActivatedRoute, RouterLink } from '@angular/router'
+import { AuthService, ConfirmService, Notifier, ServerService } from '@app/core'
 import { formatICU } from '@app/helpers'
+import { PTDatePipe } from '@app/shared/shared-main/common/date.pipe'
 import { VideoCaptionService } from '@app/shared/shared-main/video-caption/video-caption.service'
 import { VideoDetails } from '@app/shared/shared-main/video/video-details.model'
 import { VideoFileTokenService } from '@app/shared/shared-main/video/video-file-token.service'
@@ -10,66 +11,71 @@ import { Video } from '@app/shared/shared-main/video/video.model'
 import { VideoService } from '@app/shared/shared-main/video/video.service'
 import { VideoBlockComponent } from '@app/shared/shared-moderation/video-block.component'
 import { VideoBlockService } from '@app/shared/shared-moderation/video-block.service'
-import { NgbTooltip } from '@ng-bootstrap/ng-bootstrap'
+import { PrivacyBadgeComponent } from '@app/shared/shared-video/privacy-badge.component'
 import { getAllFiles } from '@peertube/peertube-core-utils'
-import { FileStorage, UserRight, VideoFile, VideoPrivacy, VideoState, VideoStreamingPlaylistType } from '@peertube/peertube-models'
+import { FileStorage, NSFWFlag, UserRight, VideoFile, VideoState, VideoStreamingPlaylistType } from '@peertube/peertube-models'
 import { videoRequiresFileToken } from '@root-helpers/video'
-import { SharedModule, SortMeta } from 'primeng/api'
-import { TableModule, TableRowExpandEvent } from 'primeng/table'
-import { finalize } from 'rxjs/operators'
+import { TableRowExpandEvent } from 'primeng/table'
 import { AdvancedInputFilter, AdvancedInputFilterComponent } from '../../../shared/shared-forms/advanced-input-filter.component'
 import { GlobalIconComponent } from '../../../shared/shared-icons/global-icon.component'
-import { AutoColspanDirective } from '../../../shared/shared-main/angular/auto-colspan.directive'
-import { BytesPipe } from '../../../shared/shared-main/angular/bytes.pipe'
-import { ActionDropdownComponent, DropdownAction } from '../../../shared/shared-main/buttons/action-dropdown.component'
+import { DropdownAction } from '../../../shared/shared-main/buttons/action-dropdown.component'
 import { ButtonComponent } from '../../../shared/shared-main/buttons/button.component'
+import { BytesPipe } from '../../../shared/shared-main/common/bytes.pipe'
+import { NumberFormatterPipe } from '../../../shared/shared-main/common/number-formatter.pipe'
 import { EmbedComponent } from '../../../shared/shared-main/video/embed.component'
-import { TableExpanderIconComponent } from '../../../shared/shared-tables/table-expander-icon.component'
+import { DataLoaderOptions, TableColumnInfo, TableComponent } from '../../../shared/shared-tables/table.component'
 import { VideoCellComponent } from '../../../shared/shared-tables/video-cell.component'
 import {
   VideoActionsDisplayType,
   VideoActionsDropdownComponent
 } from '../../../shared/shared-video-miniature/video-actions-dropdown.component'
+import { VideoNSFWBadgeComponent } from '../../../shared/shared-video/video-nsfw-badge.component'
 import { VideoAdminService } from './video-admin.service'
+
+type ColumnName =
+  | 'video'
+  | 'info'
+  | 'localVideoFilesSize'
+  | 'publishedAt'
 
 @Component({
   selector: 'my-video-list',
   templateUrl: './video-list.component.html',
   styleUrls: [ './video-list.component.scss' ],
-  standalone: true,
   imports: [
+    CommonModule,
     GlobalIconComponent,
-    TableModule,
-    NgClass,
-    SharedModule,
-    NgIf,
-    ActionDropdownComponent,
     AdvancedInputFilterComponent,
     ButtonComponent,
-    NgbTooltip,
-    TableExpanderIconComponent,
     VideoActionsDropdownComponent,
     VideoCellComponent,
-    AutoColspanDirective,
-    NgFor,
     EmbedComponent,
     VideoBlockComponent,
-    DatePipe,
+    PTDatePipe,
     RouterLink,
-    BytesPipe
+    BytesPipe,
+    PrivacyBadgeComponent,
+    VideoNSFWBadgeComponent,
+    TableComponent,
+    NumberFormatterPipe
   ]
 })
-export class VideoListComponent extends RestTable <Video> implements OnInit {
-  @ViewChild('videoBlockModal') videoBlockModal: VideoBlockComponent
+export class VideoListComponent implements OnInit {
+  private route = inject(ActivatedRoute)
+  private confirmService = inject(ConfirmService)
+  private auth = inject(AuthService)
+  private notifier = inject(Notifier)
+  private videoService = inject(VideoService)
+  private videoAdminService = inject(VideoAdminService)
+  private videoBlockService = inject(VideoBlockService)
+  private videoCaptionService = inject(VideoCaptionService)
+  private server = inject(ServerService)
+  private videoFileTokenService = inject(VideoFileTokenService)
 
-  videos: Video[] = []
-
-  totalRecords = 0
-  sort: SortMeta = { field: 'publishedAt', order: -1 }
-  pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
+  readonly videoBlockModal = viewChild<VideoBlockComponent>('videoBlockModal')
+  readonly table = viewChild<TableComponent<Video>>('table')
 
   bulkActions: DropdownAction<Video[]>[][] = []
-
   inputFilters: AdvancedInputFilter[]
 
   videoActionsOptions: VideoActionsDisplayType = {
@@ -84,29 +90,22 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
     liveInfo: false,
     removeFiles: true,
     transcoding: true,
-    studio: true,
-    stats: true,
     generateTranscription: true
   }
 
-  loading = true
+  columns: TableColumnInfo<ColumnName>[] = [
+    { id: 'video', label: $localize`Video`, sortable: false },
+    { id: 'info', label: $localize`Info`, sortable: false },
+    { id: 'localVideoFilesSize', label: $localize`Files`, sortable: true },
+    { id: 'publishedAt', label: $localize`Published`, sortable: true }
+  ]
 
-  private videoFileTokens: { [ videoId: number ]: string } = {}
+  private videoFileTokens: { [videoId: number]: string } = {}
 
-  constructor (
-    protected route: ActivatedRoute,
-    protected router: Router,
-    private confirmService: ConfirmService,
-    private auth: AuthService,
-    private notifier: Notifier,
-    private videoService: VideoService,
-    private videoAdminService: VideoAdminService,
-    private videoBlockService: VideoBlockService,
-    private videoCaptionService: VideoCaptionService,
-    private server: ServerService,
-    private videoFileTokenService: VideoFileTokenService
-  ) {
-    super()
+  dataLoader: typeof this._dataLoader
+
+  constructor () {
+    this.dataLoader = this._dataLoader.bind(this)
   }
 
   get authUser () {
@@ -118,8 +117,6 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
   }
 
   ngOnInit () {
-    this.initialize()
-
     this.inputFilters = this.videoAdminService.buildAdminInputFilter()
 
     this.bulkActions = [
@@ -132,7 +129,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
         },
         {
           label: $localize`Block`,
-          handler: videos => this.videoBlockModal.show(videos),
+          handler: videos => this.videoBlockModal().show(videos),
           isDisplayed: videos => this.authUser.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST) && videos.every(v => !v.blacklisted),
           iconName: 'no'
         },
@@ -178,16 +175,6 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
         }
       ]
     ]
-  }
-
-  getIdentifier () {
-    return 'VideoListComponent'
-  }
-
-  getPrivacyBadgeClass (video: Video) {
-    if (video.privacy.id === VideoPrivacy.PUBLIC) return 'badge-green'
-
-    return 'badge-yellow'
   }
 
   isUnpublished (video: Video) {
@@ -256,7 +243,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
       .subscribe({
         next: () => {
           this.notifier.success($localize`File removed.`)
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
@@ -272,7 +259,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
       .subscribe({
         next: () => {
           this.notifier.success($localize`Original file removed.`)
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
@@ -282,14 +269,15 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
   buildSearchAutoTag (tag: string) {
     const str = `autoTag:"${tag}"`
 
-    if (this.search) return this.search + ' ' + str
+    const search = this.route.snapshot.queryParams.search
+    if (search) return search + ' ' + str
 
     return str
   }
 
   // ---------------------------------------------------------------------------
 
-  onVideoPanelOpened (event: TableRowExpandEvent) {
+  onRowExpand (event: TableRowExpandEvent) {
     const video = event.data as VideoDetails
 
     if (!video.videoSource?.filename && !videoRequiresFileToken(video)) return
@@ -309,23 +297,14 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
 
   // ---------------------------------------------------------------------------
 
-  protected reloadDataInternal () {
-    this.loading = true
+  private _dataLoader (options: DataLoaderOptions) {
+    return this.videoAdminService.getAdminVideos({
+      ...options,
 
-    this.videoAdminService.getAdminVideos({
-      pagination: this.pagination,
-      sort: this.sort,
-      nsfw: 'both', // Always list NSFW video, overriding instance/user setting
-      search: this.search
-    }).pipe(finalize(() => this.loading = false))
-      .subscribe({
-        next: resultList => {
-          this.videos = resultList.data
-          this.totalRecords = resultList.total
-        },
-
-        error: err => this.notifier.error(err.message)
-      })
+      // Always list NSFW video, overriding instance/user setting
+      nsfw: 'both',
+      nsfwFlagsExcluded: NSFWFlag.NONE
+    })
   }
 
   private async removeVideos (videos: Video[]) {
@@ -347,7 +326,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
             )
           )
 
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
@@ -365,7 +344,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
             )
           )
 
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
@@ -376,13 +355,11 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
     let message: string
 
     if (type === 'hls') {
-      // eslint-disable-next-line max-len
       message = formatICU(
         $localize`Are you sure you want to delete {count, plural, =1 {1 HLS streaming playlist} other {{count} HLS streaming playlists}}?`,
         { count: videos.length }
       )
     } else {
-      // eslint-disable-next-line max-len
       message = formatICU(
         $localize`Are you sure you want to delete Web Video files of {count, plural, =1 {1 video} other {{count} videos}}?`,
         { count: videos.length }
@@ -396,7 +373,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
       .subscribe({
         next: () => {
           this.notifier.success($localize`Files were removed.`)
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
@@ -409,7 +386,7 @@ export class VideoListComponent extends RestTable <Video> implements OnInit {
         next: () => {
           this.notifier.success($localize`Transcoding jobs created.`)
 
-          this.reloadData()
+          this.table().loadData()
         },
 
         error: err => this.notifier.error(err.message)
